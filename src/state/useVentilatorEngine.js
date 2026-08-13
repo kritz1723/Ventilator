@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SimClock } from '../engine/clock.js'
-import * as volumeControl from '../engine/ventilatorModes/volumeControl.js'
-import * as pressureControl from '../engine/ventilatorModes/pressureControl.js'
+import { MODES, DEFAULT_MODE } from '../engine/ventilatorModes/index.js'
+import { getBreathTiming } from '../engine/ventilatorModes/breathTiming.js'
 import { evaluateAlarms } from '../engine/alarms.js'
+import { computeMeasurements } from '../engine/measurements.js'
+import { MANEUVER, HOLD_DURATION_SECONDS, maneuverResult } from '../engine/maneuvers.js'
 
 const WAVEFORM_SECONDS = 10
 const SAMPLE_HZ = 50
 export const BUFFER_LENGTH = WAVEFORM_SECONDS * SAMPLE_HZ
 
-const MODES = { VC: volumeControl, PC: pressureControl }
-
 const INSPIRATION_PHASES = new Set(['inspiration-flow', 'inspiration-pause', 'inspiration'])
+
+function labelFor(type) {
+  return type === MANEUVER.INSPIRATORY_HOLD ? 'Inspiratory hold' : 'Expiratory hold'
+}
 
 function createEmptyBuffer(peep = 0) {
   return Array.from({ length: BUFFER_LENGTH }, () => ({ pressure: peep, flow: 0, volume: 0 }))
@@ -20,7 +24,9 @@ function emptyNumerics(peep) {
   return {
     peakPressure: peep,
     plateauPressure: peep,
+    meanPressure: peep,
     peep,
+    peakFlow: 0,
     tidalVolumeDelivered: 0,
     tidalVolumeExhaled: 0,
     measuredRR: 0,
@@ -28,59 +34,129 @@ function emptyNumerics(peep) {
   }
 }
 
-// Drives the simulation clock, steps the active ventilator mode against the
-// lung model each tick, and derives the waveform buffer + clinical numerics
-// the UI reads. Runs the fixed-step physics inside refs (not React state)
-// so the integration is not affected by render timing.
-export function useVentilatorEngine({ settings, patient }) {
-  const [running, setRunning] = useState(true)
-  const [waveform, setWaveform] = useState(() => createEmptyBuffer(settings.peep))
-  const [numerics, setNumerics] = useState(() => emptyNumerics(settings.peep))
-  const [alarms, setAlarms] = useState([])
+const emptyMeasurements = {
+  cstat: null, cdyn: null, rinsp: null, drivingPressure: null,
+  timeConstant: null, rsbi: null, mechanicalPower: null,
+  ti: null, te: null, ieRatio: null,
+}
 
+// Drives the simulation clock, steps the active ventilator mode against the
+// lung model each tick, and derives the waveform buffer, breath loop,
+// numerics and mechanics the UI reads. The fixed-step physics runs inside
+// refs (not React state) so integration is unaffected by render timing.
+export function useVentilatorEngine({ settings, patient, ventilating, technical }) {
+  const [waveform, setWaveform] = useState(() => createEmptyBuffer(settings.peep))
+  const [loop, setLoop] = useState([])
+  const [numerics, setNumerics] = useState(() => emptyNumerics(settings.peep))
+  const [measurements, setMeasurements] = useState(emptyMeasurements)
+  const [alarms, setAlarms] = useState([])
+  const [maneuver, setManeuver] = useState(null)
+
+  const maneuverRef = useRef(null)
+  const pendingManeuverRef = useRef(null)
+  const maneuverElapsedRef = useRef(0)
   const settingsRef = useRef(settings)
   const patientRef = useRef(patient)
+  const technicalRef = useRef(technical)
   settingsRef.current = settings
   patientRef.current = patient
+  technicalRef.current = technical
 
-  const clockRef = useRef(null)
-  const modeStateRef = useRef(MODES[settings.mode].initialState)
+  const modeStateRef = useRef(MODES[settings.mode]?.impl.initialState ?? MODES[DEFAULT_MODE].impl.initialState)
   const bufferRef = useRef(createEmptyBuffer(settings.peep))
+  const breathSamplesRef = useRef([])
   const timeRef = useRef(0)
   const breathPeakRef = useRef(settings.peep)
   const plateauRef = useRef(settings.peep)
+  const pressureSumRef = useRef(0)
+  const pressureCountRef = useRef(0)
+  const peakFlowRef = useRef(0)
   const deliveredVolumeRef = useRef(0)
   const lastBreathTimeRef = useRef(0)
   const breathIntervalsRef = useRef([])
-  const lastExhaledVolumeRef = useRef(0)
-  const activeModeNameRef = useRef(settings.mode)
+  const activeModeRef = useRef(settings.mode)
 
   const resetBreathTracking = useCallback(() => {
     breathPeakRef.current = settingsRef.current.peep
     plateauRef.current = settingsRef.current.peep
+    pressureSumRef.current = 0
+    pressureCountRef.current = 0
+    peakFlowRef.current = 0
     deliveredVolumeRef.current = 0
   }, [])
 
-  // Reset engine state when the mode or patient preset changes.
+  // Restart the mode state machine when the mode changes.
   useEffect(() => {
-    if (activeModeNameRef.current !== settings.mode) {
-      activeModeNameRef.current = settings.mode
-      modeStateRef.current = MODES[settings.mode].initialState
+    if (activeModeRef.current !== settings.mode) {
+      activeModeRef.current = settings.mode
+      modeStateRef.current = MODES[settings.mode]?.impl.initialState
+        ?? MODES[DEFAULT_MODE].impl.initialState
+      breathSamplesRef.current = []
       resetBreathTracking()
       lastBreathTimeRef.current = timeRef.current
     }
   }, [settings.mode, resetBreathTracking])
 
+  const engageHold = useCallback((type, volume) => {
+    pendingManeuverRef.current = null
+    maneuverRef.current = type
+    maneuverElapsedRef.current = 0
+    setManeuver(maneuverResult({
+      type,
+      volume,
+      compliance: patientRef.current.compliance,
+      peep: settingsRef.current.peep,
+    }))
+  }, [])
+
   const tick = useCallback((dt) => {
-    const modeImpl = MODES[activeModeNameRef.current]
-    const result = modeImpl.step({
+    const activeSettings = settingsRef.current
+
+    // While a hold is active both valves are shut: no flow, and airway
+    // pressure equilibrates with alveolar pressure.
+    if (maneuverRef.current) {
+      const held = modeStateRef.current
+      const pressure = activeSettings.peep + held.volume / patientRef.current.compliance
+      const sample = { pressure, flow: 0, volume: held.volume }
+      const buf = bufferRef.current
+      buf.push(sample)
+      if (buf.length > BUFFER_LENGTH) buf.shift()
+
+      maneuverElapsedRef.current += dt
+      timeRef.current += dt
+      lastBreathTimeRef.current += dt // a hold is not an apnea
+
+      if (maneuverElapsedRef.current >= HOLD_DURATION_SECONDS) {
+        maneuverRef.current = null
+        maneuverElapsedRef.current = 0
+      }
+      return
+    }
+
+    const impl = (MODES[activeModeRef.current] ?? MODES[DEFAULT_MODE]).impl
+    const result = impl.step({
       state: modeStateRef.current,
-      settings: settingsRef.current,
+      settings: activeSettings,
       patient: patientRef.current,
       dt,
     })
+    const wasInspiring = INSPIRATION_PHASES.has(modeStateRef.current.phase)
     modeStateRef.current = result
     timeRef.current += dt
+
+    // Engage a pending hold at the phase boundary where its reading is
+    // meaningful: end inspiration for a plateau, end expiration for total
+    // PEEP. Until then the request simply waits.
+    if (pendingManeuverRef.current === MANEUVER.INSPIRATORY_HOLD
+        && wasInspiring && result.phase === 'expiration') {
+      engageHold(MANEUVER.INSPIRATORY_HOLD, Math.max(result.volume, deliveredVolumeRef.current))
+    } else if (pendingManeuverRef.current === MANEUVER.EXPIRATORY_HOLD && result.breathComplete) {
+      engageHold(MANEUVER.EXPIRATORY_HOLD, result.volume)
+    }
+
+    pressureSumRef.current += result.pressure
+    pressureCountRef.current += 1
+    peakFlowRef.current = Math.max(peakFlowRef.current, result.flow)
 
     if (INSPIRATION_PHASES.has(result.phase)) {
       breathPeakRef.current = Math.max(breathPeakRef.current, result.pressure)
@@ -90,50 +166,68 @@ export function useVentilatorEngine({ settings, patient }) {
       }
     }
 
+    const sample = { pressure: result.pressure, flow: result.flow, volume: result.volume }
+    breathSamplesRef.current.push(sample)
+
     if (result.breathComplete) {
       const interval = timeRef.current - lastBreathTimeRef.current
       lastBreathTimeRef.current = timeRef.current
       breathIntervalsRef.current = [...breathIntervalsRef.current, interval].slice(-6)
-      lastExhaledVolumeRef.current = deliveredVolumeRef.current
 
-      const avgInterval = breathIntervalsRef.current.reduce((a, b) => a + b, 0) / breathIntervalsRef.current.length
+      const avgInterval = breathIntervalsRef.current.reduce((a, b) => a + b, 0)
+        / breathIntervalsRef.current.length
       const measuredRR = avgInterval > 0 ? 60 / avgInterval : 0
+      const vte = deliveredVolumeRef.current
+      const peak = breathPeakRef.current
+      const plateau = plateauRef.current
+      const mean = pressureCountRef.current > 0
+        ? pressureSumRef.current / pressureCountRef.current
+        : activeSettings.peep
 
       setNumerics({
-        peakPressure: breathPeakRef.current,
-        plateauPressure: plateauRef.current,
-        peep: settingsRef.current.peep,
-        tidalVolumeDelivered: deliveredVolumeRef.current,
-        tidalVolumeExhaled: lastExhaledVolumeRef.current,
+        peakPressure: peak,
+        plateauPressure: plateau,
+        meanPressure: mean,
+        peep: activeSettings.peep,
+        peakFlow: peakFlowRef.current,
+        tidalVolumeDelivered: vte,
+        tidalVolumeExhaled: vte,
         measuredRR,
-        minuteVolume: (lastExhaledVolumeRef.current * measuredRR) / 1000,
+        minuteVolume: (vte * measuredRR) / 1000,
       })
 
+      const { ti, te } = getBreathTiming(activeSettings)
+      setMeasurements(computeMeasurements({
+        tidalVolume: vte,
+        peakPressure: peak,
+        plateauPressure: plateau,
+        peep: activeSettings.peep,
+        peakFlow: peakFlowRef.current,
+        respRate: measuredRR,
+        compliance: patientRef.current.compliance,
+        resistance: patientRef.current.resistance,
+        ti,
+        te,
+      }))
+
+      setLoop(breathSamplesRef.current)
+      breathSamplesRef.current = []
       resetBreathTracking()
     }
 
     const buffer = bufferRef.current
-    buffer.push({ pressure: result.pressure, flow: result.flow, volume: result.volume })
+    buffer.push(sample)
     if (buffer.length > BUFFER_LENGTH) buffer.shift()
-  }, [resetBreathTracking])
+  }, [resetBreathTracking, engageHold])
 
   // Render loop: copy refs into React state once per animation frame.
   useEffect(() => {
-    if (!running) return undefined
+    if (!ventilating) return undefined
     const clock = new SimClock()
-    clockRef.current = clock
     let frameHandle
 
     const render = () => {
       setWaveform([...bufferRef.current])
-      const timeSinceLastBreath = timeRef.current - lastBreathTimeRef.current
-      setAlarms(
-        evaluateAlarms({
-          peakPressure: breathPeakRef.current,
-          alarmLimits: settingsRef.current.alarmLimits,
-          timeSinceLastBreath,
-        }),
-      )
       frameHandle = requestAnimationFrame(render)
     }
 
@@ -144,27 +238,56 @@ export function useVentilatorEngine({ settings, patient }) {
       clock.stop()
       cancelAnimationFrame(frameHandle)
     }
-  }, [running, tick])
+  }, [ventilating, tick])
+
+  // Alarm evaluation runs off the latest committed numerics.
+  useEffect(() => {
+    const timeSinceLastBreath = timeRef.current - lastBreathTimeRef.current
+    setAlarms(evaluateAlarms({
+      peakPressure: numerics.peakPressure,
+      minuteVolume: numerics.minuteVolume,
+      tidalVolumeExhaled: numerics.tidalVolumeExhaled,
+      measuredRR: numerics.measuredRR,
+      alarmLimits: settings.alarmLimits,
+      timeSinceLastBreath,
+      ventilating,
+      technical: technicalRef.current,
+    }))
+  }, [numerics, settings.alarmLimits, ventilating])
+
+  // Holds are armed and then captured at the correct point in the breath:
+  // an inspiratory hold at end inspiration, an expiratory hold at end
+  // expiration, which is where each reading is meaningful.
+  const startManeuver = useCallback((type) => {
+    if (maneuverRef.current) return
+    pendingManeuverRef.current = type
+    setManeuver({ label: labelFor(type), pending: true, readings: [] })
+  }, [])
+
+  const clearManeuver = useCallback(() => setManeuver(null), [])
 
   const reset = useCallback(() => {
-    modeStateRef.current = MODES[activeModeNameRef.current].initialState
-    bufferRef.current = createEmptyBuffer(settingsRef.current.peep)
+    const peep = settingsRef.current.peep
+    modeStateRef.current = (MODES[activeModeRef.current] ?? MODES[DEFAULT_MODE]).impl.initialState
+    bufferRef.current = createEmptyBuffer(peep)
+    breathSamplesRef.current = []
     timeRef.current = 0
     lastBreathTimeRef.current = 0
     breathIntervalsRef.current = []
     resetBreathTracking()
-    setWaveform(createEmptyBuffer(settingsRef.current.peep))
-    setNumerics(emptyNumerics(settingsRef.current.peep))
+    setWaveform(createEmptyBuffer(peep))
+    setLoop([])
+    setNumerics(emptyNumerics(peep))
+    setMeasurements(emptyMeasurements)
     setAlarms([])
+    setManeuver(null)
+    maneuverRef.current = null
+    pendingManeuverRef.current = null
+    maneuverElapsedRef.current = 0
   }, [resetBreathTracking])
 
   return {
-    running,
-    start: () => setRunning(true),
-    stop: () => setRunning(false),
-    reset,
-    waveform,
-    numerics,
-    alarms,
+    waveform, loop, numerics, measurements, alarms, reset,
+    maneuver, startManeuver, clearManeuver,
   }
 }
