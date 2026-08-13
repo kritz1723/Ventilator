@@ -1111,3 +1111,63 @@
 
 .trace-row-compact .trace-canvas { height: 78px; }
 .trace-row-compact .trace-legend { width: 74px; }
+
+/* ---------- Pending changes ---------- */
+.pending-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 190, 77, 0.45);
+  background: rgba(255, 190, 77, 0.09);
+}
+.pending-summary { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.pending-count {
+  display: grid; place-items: center; min-width: 22px; height: 22px;
+  border-radius: 999px; font-size: 12px; font-weight: 800;
+  background: var(--warning); color: #2a1c00;
+}
+.pending-label { font-size: 12px; font-weight: 600; color: var(--warning); }
+
+.pending-list { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+.pending-item {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; font-size: 11.5px;
+  background: var(--surface-inset); border: 1px solid var(--border-soft);
+}
+.pending-key { color: var(--text-muted); }
+.pending-from { color: var(--text-muted); text-decoration: line-through; }
+.pending-arrow { color: var(--text-muted); }
+.pending-to { color: var(--warning); font-weight: 700; }
+
+.pending-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-accept {
+  background: linear-gradient(180deg, rgba(95,224,143,0.28), rgba(95,224,143,0.1));
+  border-color: rgba(95,224,143,0.5); color: var(--ok); flex: none;
+}
+
+/* ---------- Confirmation dialog ---------- */
+.confirm-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: grid; place-items: center; padding: 20px;
+}
+.confirm-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,0.9);
+}
+.confirm-dialog h2 { margin: 0 0 8px; font-size: 17px; }
+.confirm-body { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.confirm-detail {
+  margin: 10px 0 0; padding: 8px 11px; font-size: 12.5px;
+  border-radius: var(--radius-sm); background: var(--surface-inset);
+  border: 1px solid var(--border-soft); color: var(--text-primary);
+}
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.confirm-actions .btn { flex: none; min-width: 120px; }
+.btn-confirm {
+  background: linear-gradient(180deg, rgba(76,196,245,0.3), rgba(76,196,245,0.12));
+  border-color: rgba(76,196,245,0.55); color: var(--accent);
+}
