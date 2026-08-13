@@ -73,3 +73,10 @@ describe('pressureTargetStep', () => {
     expect(later.flow).toBeLessThan(early.flow)
   })
 })
+
+describe('flow sign convention', () => {
+  it('passiveExhaleStep reports exhaled flow as negative', () => {
+    const result = passiveExhaleStep({ volume: 500, compliance: 50, resistance: 10, dt: 0.02 })
+    expect(result.flow).toBeLessThan(0)
+  })
+})
