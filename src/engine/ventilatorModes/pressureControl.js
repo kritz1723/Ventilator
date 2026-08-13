@@ -1,4 +1,4 @@
-import { passiveExhaleStep, pressureTargetStep, computeAirwayPressure } from '../lungModel.js'
+import { passiveExhaleStep, pressureTargetStep, computeAirwayPressure, expiratoryAirwayPressure } from '../lungModel.js'
 import { getBreathTiming } from './breathTiming.js'
 
 // Pressure Control: airway pressure is driven to (PEEP + set inspiratory
@@ -11,6 +11,7 @@ export function step({ state, settings, patient, dt }) {
   let { phase, phaseElapsed, volume } = state
   let flow
   let breathComplete = false
+  let expiring = false
 
   if (phase === 'inspiration') {
     const result = pressureTargetStep({
@@ -30,9 +31,11 @@ export function step({ state, settings, patient, dt }) {
       phaseElapsed += dt
     }
   } else {
+    expiring = true
     const result = passiveExhaleStep({ volume, compliance: patient.compliance, resistance: patient.resistance, dt })
     volume = result.volume
-    flow = -result.flow
+    // Already negative: expiratory flow sits below the baseline.
+    flow = result.flow
     if (phaseElapsed + dt >= te) {
       phase = 'inspiration'
       phaseElapsed = 0
@@ -42,13 +45,15 @@ export function step({ state, settings, patient, dt }) {
     }
   }
 
-  const pressure = computeAirwayPressure({
-    volume,
-    flow,
-    peep: settings.peep,
-    compliance: patient.compliance,
-    resistance: patient.resistance,
-  })
+  const pressure = expiring
+    ? expiratoryAirwayPressure({ flow, peep: settings.peep })
+    : computeAirwayPressure({
+      volume,
+      flow,
+      peep: settings.peep,
+      compliance: patient.compliance,
+      resistance: patient.resistance,
+    })
 
   return { phase, phaseElapsed, volume, flow, pressure, breathComplete }
 }
