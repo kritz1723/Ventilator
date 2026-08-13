@@ -11,6 +11,7 @@ import TestPanel from './components/TestPanel.jsx'
 import DeviceInfoDrawer from './components/DeviceInfoDrawer.jsx'
 import ManeuverResult from './components/ManeuverResult.jsx'
 import AppFooter from './components/AppFooter.jsx'
+import SnapshotPanel from './components/SnapshotPanel.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -20,6 +21,7 @@ import { AUDIO_PAUSE_SECONDS } from './engine/alarms.js'
 import { THEMES, DEFAULT_THEME } from './config/themes.js'
 import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
 import { MODES } from './engine/ventilatorModes/index.js'
+import { createSnapshot, addSnapshot } from './engine/snapshots.js'
 
 const SCREEN = { POWER_ON: 'power-on', STANDBY: 'standby', VENTILATING: 'ventilating' }
 
@@ -36,6 +38,7 @@ export default function App() {
   const [frozen, setFrozen] = useState(false)
   const [frozenWaveform, setFrozenWaveform] = useState(null)
   const [cursorIndex, setCursorIndex] = useState(null)
+  const [snapshots, setSnapshots] = useState([])
   const [now, setNow] = useState(Date.now())
 
   const patient = PATIENT_PRESETS[patientKey]
@@ -79,6 +82,13 @@ export default function App() {
       return true
     })
   }, [waveform])
+
+  const capture = useCallback(() => {
+    setSnapshots((list) => addSnapshot(
+      list,
+      createSnapshot({ numerics, measurements, settings, patient }),
+    ))
+  }, [numerics, measurements, settings, patient])
 
   const startVentilation = useCallback(() => {
     reset()
@@ -211,6 +221,14 @@ export default function App() {
               />
               <LoopsDisplay loop={loop} />
             </div>
+            <SnapshotPanel
+              snapshots={snapshots}
+              onCapture={capture}
+              onClear={() => setSnapshots([])}
+              numerics={numerics}
+              measurements={measurements}
+              settings={settings}
+            />
           </section>
         </main>
       )}
