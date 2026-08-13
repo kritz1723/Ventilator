@@ -106,6 +106,28 @@ export default function ControlPanel({
       )}
 
       <section className="panel control-section">
+        <span className="panel-title">Alarm limits</span>
+        <NumberField label="P high" unit="cmH₂O" value={settings.alarmLimits.highPressure}
+          min={10} max={80} step={1}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highPressure: v } })} />
+        <NumberField label="P low" unit="cmH₂O" value={settings.alarmLimits.lowPressure}
+          min={0} max={20} step={1}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowPressure: v } })} />
+        <NumberField label="MV high" unit="L/min" value={settings.alarmLimits.highMinuteVolume}
+          min={2} max={40} step={0.5}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highMinuteVolume: v } })} />
+        <NumberField label="MV low" unit="L/min" value={settings.alarmLimits.lowMinuteVolume}
+          min={0} max={20} step={0.5}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowMinuteVolume: v } })} />
+        <NumberField label="Vt low" unit="mL" value={settings.alarmLimits.lowTidalVolume}
+          min={0} max={1000} step={10}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowTidalVolume: v } })} />
+        <NumberField label="Rate high" unit="/min" value={settings.alarmLimits.highRespRate}
+          min={5} max={150} step={1}
+          onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highRespRate: v } })} />
+      </section>
+
+      <section className="panel control-section">
         <span className="panel-title">Maneuvers</span>
         <div className="maneuver-row">
           <button type="button" className="btn btn-ghost" onClick={() => onManeuver('inspHold')}>Insp. hold</button>

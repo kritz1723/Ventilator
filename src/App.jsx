@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import Disclaimer from './components/Disclaimer.jsx'
 import ControlPanel from './components/ControlPanel.jsx'
@@ -12,6 +12,7 @@ import DeviceInfoDrawer from './components/DeviceInfoDrawer.jsx'
 import ManeuverResult from './components/ManeuverResult.jsx'
 import AppFooter from './components/AppFooter.jsx'
 import SnapshotPanel from './components/SnapshotPanel.jsx'
+import EventLogDrawer from './components/EventLogDrawer.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -22,6 +23,9 @@ import { THEMES, DEFAULT_THEME } from './config/themes.js'
 import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
 import { MODES } from './engine/ventilatorModes/index.js'
 import { createSnapshot, addSnapshot } from './engine/snapshots.js'
+import {
+  createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
+} from './engine/eventLog.js'
 
 const SCREEN = { POWER_ON: 'power-on', STANDBY: 'standby', VENTILATING: 'ventilating' }
 
@@ -39,6 +43,8 @@ export default function App() {
   const [frozenWaveform, setFrozenWaveform] = useState(null)
   const [cursorIndex, setCursorIndex] = useState(null)
   const [snapshots, setSnapshots] = useState([])
+  const [events, setEvents] = useState([])
+  const [logOpen, setLogOpen] = useState(false)
   const [now, setNow] = useState(Date.now())
 
   const patient = PATIENT_PRESETS[patientKey]
@@ -53,6 +59,31 @@ export default function App() {
     ventilating,
     technical: { preUseCheckDue: !testStatus.partial },
   })
+
+  const log = useCallback((entry) => {
+    setEvents((prev) => appendEvent(prev, createEvent(entry)))
+  }, [])
+
+  const logMany = useCallback((entries) => {
+    if (!entries.length) return
+    setEvents((prev) => entries.reduce((acc, e) => appendEvent(acc, e), prev))
+  }, [])
+
+  // Settings and alarms are logged by comparing against the previous value,
+  // so the log records the specific change rather than the whole state.
+  const prevSettingsRef = useRef(settings)
+  useEffect(() => {
+    const entries = diffSettings(prevSettingsRef.current, settings)
+    prevSettingsRef.current = settings
+    logMany(entries)
+  }, [settings, logMany])
+
+  const prevAlarmsRef = useRef([])
+  useEffect(() => {
+    const entries = diffAlarms(prevAlarmsRef.current, alarms)
+    prevAlarmsRef.current = alarms
+    logMany(entries)
+  }, [alarms, logMany])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -84,11 +115,14 @@ export default function App() {
   }, [waveform])
 
   const capture = useCallback(() => {
-    setSnapshots((list) => addSnapshot(
-      list,
-      createSnapshot({ numerics, measurements, settings, patient }),
-    ))
-  }, [numerics, measurements, settings, patient])
+    const snap = createSnapshot({ numerics, measurements, settings, patient })
+    setSnapshots((list) => addSnapshot(list, snap))
+    log({
+      category: EVENT_CATEGORY.CAPTURE,
+      message: `Captured ${snap.id}`,
+      detail: `Ppeak ${numerics.peakPressure.toFixed(0)}, Vte ${numerics.tidalVolumeExhaled.toFixed(0)}`,
+    })
+  }, [numerics, measurements, settings, patient, log])
 
   const startVentilation = useCallback(() => {
     reset()
@@ -96,7 +130,12 @@ export default function App() {
     setFrozenWaveform(null)
     setCursorIndex(null)
     setScreen(SCREEN.VENTILATING)
-  }, [reset])
+    log({
+      category: EVENT_CATEGORY.STATE,
+      message: 'Ventilation started',
+      detail: `${settings.mode}, ${patient.label}`,
+    })
+  }, [reset, log, settings.mode, patient.label])
 
   const applyDerived = useCallback((derived) => {
     setSettings((s) => ({
@@ -117,7 +156,10 @@ export default function App() {
           <TestPanel
             suite={TEST_SUITES.powerOn}
             autoStart
-            onComplete={() => setTestStatus((s) => ({ ...s, powerOn: true }))}
+            onComplete={() => {
+              setTestStatus((s) => ({ ...s, powerOn: true }))
+              log({ category: EVENT_CATEGORY.TEST, message: 'Power-on self test passed' })
+            }}
           />
           <button
             type="button"
@@ -170,6 +212,9 @@ export default function App() {
               />
             ))}
           </div>
+          <button type="button" className="btn btn-ghost btn-tiny" onClick={() => setLogOpen(true)}>
+            Log{events.length ? ` (${events.length})` : ''}
+          </button>
           <button type="button" className="btn btn-ghost btn-tiny" onClick={() => setInfoOpen(true)}>
             Device info
           </button>
@@ -183,7 +228,10 @@ export default function App() {
           onApplyDerivedSettings={applyDerived}
           onStartVentilation={startVentilation}
           testStatus={testStatus}
-          onTestComplete={(id) => setTestStatus((s) => ({ ...s, [id]: true }))}
+          onTestComplete={(id) => {
+            setTestStatus((s) => ({ ...s, [id]: true }))
+            log({ category: EVENT_CATEGORY.TEST, message: `${id === 'leak' ? 'Leak and compliance test' : 'Partial test'} passed` })
+          }}
         />
       ) : (
         <main className="app-main">
@@ -193,15 +241,30 @@ export default function App() {
             patientKey={patientKey}
             onPatientChange={setPatientKey}
             patientCategory={patientData.category}
-            onManeuver={startManeuver}
-            onStopVentilation={() => setScreen(SCREEN.STANDBY)}
+            onManeuver={(type) => {
+              startManeuver(type)
+              log({
+                category: EVENT_CATEGORY.MANEUVER,
+                message: type === 'inspHold' ? 'Inspiratory hold requested' : 'Expiratory hold requested',
+              })
+            }}
+            onStopVentilation={() => {
+              setScreen(SCREEN.STANDBY)
+              log({ category: EVENT_CATEGORY.STATE, message: 'Ventilation stopped — standby' })
+            }}
           />
           <section className="monitor">
             <AlarmBanner
               alarms={alarms}
               audioPaused={audioPaused}
               pauseRemaining={pauseRemaining}
-              onPauseAudio={() => setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)}
+              onPauseAudio={() => {
+                setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)
+                log({
+                  category: EVENT_CATEGORY.ALARM,
+                  message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
+                })
+              }}
             />
             <WaveformDisplay
               waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
@@ -235,6 +298,7 @@ export default function App() {
 
       <AppFooter />
       <DeviceInfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <EventLogDrawer open={logOpen} onClose={() => setLogOpen(false)} events={events} />
     </div>
   )
 }
