@@ -33,6 +33,9 @@ export default function App() {
   const [testStatus, setTestStatus] = useState({})
   const [infoOpen, setInfoOpen] = useState(false)
   const [audioPausedUntil, setAudioPausedUntil] = useState(0)
+  const [frozen, setFrozen] = useState(false)
+  const [frozenWaveform, setFrozenWaveform] = useState(null)
+  const [cursorIndex, setCursorIndex] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   const patient = PATIENT_PRESETS[patientKey]
@@ -62,8 +65,26 @@ export default function App() {
   const audioPaused = audioPausedUntil > now
   const pauseRemaining = Math.max(0, Math.ceil((audioPausedUntil - now) / 1000))
 
+  // Freezing snapshots the current sweep; the engine keeps running
+  // underneath so therapy and alarms are unaffected by inspecting a trace.
+  const toggleFreeze = useCallback(() => {
+    setFrozen((wasFrozen) => {
+      if (wasFrozen) {
+        setFrozenWaveform(null)
+        setCursorIndex(null)
+        return false
+      }
+      setFrozenWaveform(waveform)
+      setCursorIndex(Math.floor(waveform.length / 2))
+      return true
+    })
+  }, [waveform])
+
   const startVentilation = useCallback(() => {
     reset()
+    setFrozen(false)
+    setFrozenWaveform(null)
+    setCursorIndex(null)
     setScreen(SCREEN.VENTILATING)
   }, [reset])
 
@@ -172,7 +193,13 @@ export default function App() {
               pauseRemaining={pauseRemaining}
               onPauseAudio={() => setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)}
             />
-            <WaveformDisplay waveform={waveform} />
+            <WaveformDisplay
+              waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
+              frozen={frozen}
+              onToggleFreeze={toggleFreeze}
+              cursorIndex={cursorIndex}
+              onCursorChange={setCursorIndex}
+            />
             <ManeuverResult maneuver={maneuver} onClose={clearManeuver} />
             <div className="monitor-lower">
               <NumericsPanel
