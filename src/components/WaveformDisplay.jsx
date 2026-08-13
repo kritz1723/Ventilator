@@ -34,7 +34,7 @@ function niceTicks(min, max) {
   return [...new Set(ticks)].sort((a, b) => a - b)
 }
 
-function draw(canvas, data, trace) {
+function draw(canvas, data, trace, cursorIndex = null) {
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
   const cssWidth = canvas.clientWidth
@@ -117,27 +117,67 @@ function draw(canvas, data, trace) {
   ctx.stroke()
   ctx.shadowBlur = 0
 
-  // Leading-edge marker
-  const lastX = xFor(data.length - 1)
-  const lastY = yFor(data[data.length - 1][trace.key])
+  if (cursorIndex == null) {
+    // Leading-edge marker follows the newest sample while sweeping.
+    const lastX = xFor(data.length - 1)
+    const lastY = yFor(data[data.length - 1][trace.key])
+    ctx.fillStyle = colors.trace
+    ctx.beginPath()
+    ctx.arc(lastX, lastY, 2.6, 0, Math.PI * 2)
+    ctx.fill()
+    return
+  }
+
+  // Frozen: draw a measurement cursor at the inspected sample instead.
+  const i = Math.min(Math.max(cursorIndex, 0), data.length - 1)
+  const cx = xFor(i)
+  const cy = yFor(data[i][trace.key])
+  ctx.strokeStyle = colors.axis
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 3])
+  ctx.beginPath()
+  ctx.moveTo(cx, 0)
+  ctx.lineTo(cx, cssHeight)
+  ctx.stroke()
+  ctx.setLineDash([])
+
   ctx.fillStyle = colors.trace
   ctx.beginPath()
-  ctx.arc(lastX, lastY, 2.6, 0, Math.PI * 2)
+  ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
   ctx.fill()
+  ctx.strokeStyle = colors.zero
+  ctx.lineWidth = 1.4
+  ctx.beginPath()
+  ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
+  ctx.stroke()
 }
 
-function TraceCanvas({ data, trace }) {
+function TraceCanvas({ data, trace, cursorIndex, onScrub }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return undefined
-    draw(canvas, data, trace)
+    draw(canvas, data, trace, cursorIndex)
 
-    const observer = new ResizeObserver(() => draw(canvas, data, trace))
+    const observer = new ResizeObserver(() => draw(canvas, data, trace, cursorIndex))
     observer.observe(canvas)
     return () => observer.disconnect()
-  }, [data, trace])
+  }, [data, trace, cursorIndex])
+
+  // While frozen, clicking or dragging on a trace moves the shared cursor.
+  const handlePointer = (e) => {
+    if (!onScrub) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const padLeft = 34
+    const plotW = rect.width - padLeft
+    const frac = (e.clientX - rect.left - padLeft) / plotW
+    onScrub(Math.round(Math.min(Math.max(frac, 0), 1) * (data.length - 1)))
+  }
+
+  const value = cursorIndex != null && data.length
+    ? data[Math.min(Math.max(cursorIndex, 0), data.length - 1)][trace.key]
+    : null
 
   return (
     <div className="trace-row">
@@ -145,21 +185,58 @@ function TraceCanvas({ data, trace }) {
         <span className="trace-dot" style={{ background: `var(${trace.token})` }} />
         <span className="trace-name">{trace.label}</span>
         <span className="trace-unit">{trace.unit}</span>
+        {value != null && (
+          <span className="trace-cursor-value tnum" style={{ color: `var(${trace.token})` }}>
+            {value.toFixed(1)}
+          </span>
+        )}
       </div>
-      <canvas ref={canvasRef} className="trace-canvas" />
+      <canvas
+        ref={canvasRef}
+        className={onScrub ? 'trace-canvas trace-canvas-scrub' : 'trace-canvas'}
+        onPointerDown={handlePointer}
+        onPointerMove={(e) => { if (e.buttons === 1) handlePointer(e) }}
+      />
     </div>
   )
 }
 
-export default function WaveformDisplay({ waveform }) {
+export default function WaveformDisplay({
+  waveform, frozen, onToggleFreeze, cursorIndex, onCursorChange,
+}) {
+  const cursorTime = cursorIndex != null && waveform.length > 1
+    ? ((cursorIndex / (waveform.length - 1)) * SWEEP_SECONDS - SWEEP_SECONDS).toFixed(2)
+    : null
+
   return (
-    <div className="waveform-display panel">
+    <div className={frozen ? 'waveform-display panel is-frozen' : 'waveform-display panel'}>
       <div className="waveform-header">
         <span className="panel-title">Waveforms</span>
-        <span className="waveform-scale">{SWEEP_SECONDS}s sweep</span>
+        <div className="waveform-tools">
+          {frozen && cursorTime != null && (
+            <span className="cursor-time tnum">{cursorTime}s</span>
+          )}
+          <span className="waveform-scale">{SWEEP_SECONDS}s sweep</span>
+          <button
+            type="button"
+            className={frozen ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
+            onClick={onToggleFreeze}
+          >
+            {frozen ? 'Resume' : 'Freeze'}
+          </button>
+        </div>
       </div>
+      {frozen && (
+        <p className="freeze-hint">Frozen — click or drag across a trace to inspect a point.</p>
+      )}
       {TRACES.map((trace) => (
-        <TraceCanvas key={trace.key} data={waveform} trace={trace} />
+        <TraceCanvas
+          key={trace.key}
+          data={waveform}
+          trace={trace}
+          cursorIndex={frozen ? cursorIndex : null}
+          onScrub={frozen ? onCursorChange : null}
+        />
       ))}
     </div>
   )

@@ -965,3 +965,16 @@
 @media (max-width: 640px) {
   .app-footer { padding: 10px 16px; }
 }
+
+/* ---------- Freeze / cursor ---------- */
+.waveform-tools { display: flex; align-items: center; gap: 10px; }
+.waveform-display.is-frozen { border-color: rgba(76, 196, 245, 0.4); }
+.freeze-active { color: var(--accent); border-color: rgba(76, 196, 245, 0.45); }
+.cursor-time {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  padding: 3px 8px; border-radius: 999px;
+  background: rgba(76, 196, 245, 0.12); border: 1px solid rgba(76, 196, 245, 0.3);
+}
+.freeze-hint { margin: 0 0 6px; font-size: 11px; color: var(--text-muted); }
+.trace-canvas-scrub { cursor: crosshair; }
+.trace-cursor-value { font-size: 13px; font-weight: 700; margin-top: 2px; }
