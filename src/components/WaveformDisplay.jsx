@@ -1,12 +1,32 @@
 import { useEffect, useRef } from 'react'
 
 const TRACES = [
-  { key: 'pressure', label: 'Paw', unit: 'cmH₂O', color: '#4cc4f5', min: -5, max: 45 },
-  { key: 'flow', label: 'Flow', unit: 'L/min', color: '#5fe08f', min: -80, max: 80 },
-  { key: 'volume', label: 'Volume', unit: 'mL', color: '#f5c85c', min: 0, max: 800 },
+  { key: 'pressure', label: 'Paw', unit: 'cmH₂O', token: '--paw', min: -5, max: 45 },
+  { key: 'flow', label: 'Flow', unit: 'L/min', token: '--flow', min: -80, max: 80 },
+  { key: 'volume', label: 'Volume', unit: 'mL', token: '--volume', min: 0, max: 800 },
 ]
 
 const SWEEP_SECONDS = 10
+
+// Trace and grid colours come from the active theme's CSS custom properties
+// so the canvas repaints correctly when the theme changes.
+function themeColors(el, token) {
+  const cs = getComputedStyle(el)
+  return {
+    trace: cs.getPropertyValue(token).trim() || '#4cc4f5',
+    grid: cs.getPropertyValue('--grid-line').trim() || 'rgba(255,255,255,0.05)',
+    zero: cs.getPropertyValue('--grid-zero').trim() || 'rgba(255,255,255,0.2)',
+    axis: cs.getPropertyValue('--axis-text').trim() || 'rgba(255,255,255,0.3)',
+  }
+}
+
+function withAlpha(color, alpha) {
+  // Works for hex tokens; falls back to the colour itself for other formats.
+  if (/^#[0-9a-f]{6}$/i.test(color)) {
+    return color + Math.round(alpha * 255).toString(16).padStart(2, '0')
+  }
+  return color
+}
 
 function niceTicks(min, max) {
   const ticks = [min, min + (max - min) / 2, max]
@@ -28,6 +48,7 @@ function draw(canvas, data, trace) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cssWidth, cssHeight)
 
+  const colors = themeColors(canvas, trace.token)
   const padLeft = 34
   const plotW = cssWidth - padLeft
   const yFor = (v) => {
@@ -36,7 +57,7 @@ function draw(canvas, data, trace) {
   }
 
   // Vertical time gridlines, one per second
-  ctx.strokeStyle = 'rgba(255,255,255,0.045)'
+  ctx.strokeStyle = colors.grid
   ctx.lineWidth = 1
   for (let s = 1; s < SWEEP_SECONDS; s += 1) {
     const x = padLeft + (s / SWEEP_SECONDS) * plotW
@@ -53,12 +74,12 @@ function draw(canvas, data, trace) {
   for (const tick of niceTicks(trace.min, trace.max)) {
     const y = yFor(tick)
     const isZero = tick === 0
-    ctx.strokeStyle = isZero ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.055)'
+    ctx.strokeStyle = isZero ? colors.zero : colors.grid
     ctx.beginPath()
     ctx.moveTo(padLeft, y)
     ctx.lineTo(cssWidth, y)
     ctx.stroke()
-    ctx.fillStyle = isZero ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.28)'
+    ctx.fillStyle = colors.axis
     ctx.fillText(String(tick), padLeft - 6, Math.min(Math.max(y, 7), cssHeight - 7))
   }
 
@@ -69,8 +90,8 @@ function draw(canvas, data, trace) {
 
   // Gradient fill under the trace
   const fill = ctx.createLinearGradient(0, 0, 0, cssHeight)
-  fill.addColorStop(0, `${trace.color}38`)
-  fill.addColorStop(1, `${trace.color}00`)
+  fill.addColorStop(0, withAlpha(colors.trace, 0.22))
+  fill.addColorStop(1, withAlpha(colors.trace, 0))
   ctx.fillStyle = fill
   ctx.beginPath()
   ctx.moveTo(xFor(0), baselineY)
@@ -87,11 +108,11 @@ function draw(canvas, data, trace) {
     if (i === 0) ctx.moveTo(x, y)
     else ctx.lineTo(x, y)
   })
-  ctx.strokeStyle = trace.color
+  ctx.strokeStyle = colors.trace
   ctx.lineWidth = 1.9
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.shadowColor = trace.color
+  ctx.shadowColor = colors.trace
   ctx.shadowBlur = 9
   ctx.stroke()
   ctx.shadowBlur = 0
@@ -99,7 +120,7 @@ function draw(canvas, data, trace) {
   // Leading-edge marker
   const lastX = xFor(data.length - 1)
   const lastY = yFor(data[data.length - 1][trace.key])
-  ctx.fillStyle = trace.color
+  ctx.fillStyle = colors.trace
   ctx.beginPath()
   ctx.arc(lastX, lastY, 2.6, 0, Math.PI * 2)
   ctx.fill()
@@ -121,7 +142,7 @@ function TraceCanvas({ data, trace }) {
   return (
     <div className="trace-row">
       <div className="trace-legend">
-        <span className="trace-dot" style={{ background: trace.color, boxShadow: `0 0 10px ${trace.color}` }} />
+        <span className="trace-dot" style={{ background: `var(${trace.token})` }} />
         <span className="trace-name">{trace.label}</span>
         <span className="trace-unit">{trace.unit}</span>
       </div>
