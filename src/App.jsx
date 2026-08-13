@@ -13,6 +13,8 @@ import ManeuverResult from './components/ManeuverResult.jsx'
 import AppFooter from './components/AppFooter.jsx'
 import SnapshotPanel from './components/SnapshotPanel.jsx'
 import EventLogDrawer from './components/EventLogDrawer.jsx'
+import ConfirmDialog from './components/ConfirmDialog.jsx'
+import PendingChangesBar from './components/PendingChangesBar.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -23,6 +25,9 @@ import { THEMES, DEFAULT_THEME } from './config/themes.js'
 import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
 import { MODES } from './engine/ventilatorModes/index.js'
 import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
+import {
+  CONFIRMABLE, pendingDiff, clampToRanges,
+} from './engine/pendingChanges.js'
 import { createSnapshot, addSnapshot } from './engine/snapshots.js'
 import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
@@ -47,10 +52,16 @@ export default function App() {
   const [events, setEvents] = useState([])
   const [logOpen, setLogOpen] = useState(false)
   const [layout, setLayout] = useState(DEFAULT_LAYOUT)
+  // While ventilating, edits go to a pending copy and reach the patient only
+  // when accepted. In standby they apply directly — nothing is being
+  // delivered, so there is nothing to guard.
+  const [pendingSettings, setPendingSettings] = useState(null)
+  const [confirm, setConfirm] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   const patient = PATIENT_PRESETS[patientKey]
   const ventilating = screen === SCREEN.VENTILATING
+  const editedSettings = pendingSettings ?? settings
 
   const {
     waveform, loop, numerics, measurements, alarms, reset,
@@ -116,6 +127,37 @@ export default function App() {
     })
   }, [waveform])
 
+  // Mode is a therapy-level change, so it is confirmed rather than staged.
+  const changeSettings = useCallback((next) => {
+    if (!ventilating) {
+      setSettings(next)
+      return
+    }
+    if (next.mode !== settings.mode) {
+      setConfirm({ action: CONFIRMABLE.MODE, payload: next.mode })
+      return
+    }
+    setPendingSettings(next)
+  }, [ventilating, settings.mode])
+
+  const acceptPending = useCallback(() => {
+    if (!pendingSettings) return
+    setSettings(pendingSettings)
+    setPendingSettings(null)
+  }, [pendingSettings])
+
+  const cancelPending = useCallback(() => {
+    const discarded = pendingDiff(settings, pendingSettings)
+    setPendingSettings(null)
+    if (discarded.length) {
+      log({
+        category: EVENT_CATEGORY.SETTING,
+        message: `${discarded.length} pending change${discarded.length === 1 ? '' : 's'} cancelled`,
+        detail: discarded.map((c) => `${c.key} ${c.from}→${c.to}`).join(', '),
+      })
+    }
+  }, [settings, pendingSettings, log])
+
   const capture = useCallback(() => {
     const snap = createSnapshot({ numerics, measurements, settings, patient })
     setSnapshots((list) => addSnapshot(list, snap))
@@ -125,6 +167,27 @@ export default function App() {
       detail: `Ppeak ${numerics.peakPressure.toFixed(0)}, Vte ${numerics.tidalVolumeExhaled.toFixed(0)}`,
     })
   }, [numerics, measurements, settings, patient, log])
+
+  const resolveConfirm = useCallback(() => {
+    if (!confirm) return
+    const { action, payload } = confirm
+    setConfirm(null)
+
+    if (action === CONFIRMABLE.MODE) {
+      setSettings((s) => ({ ...s, mode: payload }))
+      setPendingSettings(null)
+    } else if (action === CONFIRMABLE.CATEGORY) {
+      setPatientData((d) => ({ ...d, category: payload }))
+      setSettings((s) => clampToRanges(s, PATIENT_CATEGORIES[payload].ranges))
+      log({ category: EVENT_CATEGORY.SETTING, message: `Patient category changed to ${PATIENT_CATEGORIES[payload].label}` })
+    } else if (action === CONFIRMABLE.STOP) {
+      setPendingSettings(null)
+      setScreen(SCREEN.STANDBY)
+      log({ category: EVENT_CATEGORY.STATE, message: 'Ventilation stopped — standby' })
+    } else if (action === CONFIRMABLE.START) {
+      payload()
+    }
+  }, [confirm, log])
 
   const startVentilation = useCallback(() => {
     reset()
@@ -228,7 +291,7 @@ export default function App() {
           patientData={patientData}
           onPatientDataChange={setPatientData}
           onApplyDerivedSettings={applyDerived}
-          onStartVentilation={startVentilation}
+          onStartVentilation={() => setConfirm({ action: CONFIRMABLE.START, payload: startVentilation })}
           testStatus={testStatus}
           onTestComplete={(id) => {
             setTestStatus((s) => ({ ...s, [id]: true }))
@@ -238,8 +301,8 @@ export default function App() {
       ) : (
         <main className="app-main">
           <ControlPanel
-            settings={settings}
-            onSettingsChange={setSettings}
+            settings={editedSettings}
+            onSettingsChange={changeSettings}
             patientKey={patientKey}
             onPatientChange={setPatientKey}
             patientCategory={patientData.category}
@@ -250,10 +313,7 @@ export default function App() {
                 message: type === 'inspHold' ? 'Inspiratory hold requested' : 'Expiratory hold requested',
               })
             }}
-            onStopVentilation={() => {
-              setScreen(SCREEN.STANDBY)
-              log({ category: EVENT_CATEGORY.STATE, message: 'Ventilation stopped — standby' })
-            }}
+            onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">
             <AlarmBanner
@@ -267,6 +327,11 @@ export default function App() {
                   message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
                 })
               }}
+            />
+            <PendingChangesBar
+              changes={pendingDiff(settings, pendingSettings)}
+              onAccept={acceptPending}
+              onCancel={cancelPending}
             />
             <WaveformDisplay
               waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
@@ -303,6 +368,14 @@ export default function App() {
       <AppFooter />
       <DeviceInfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
       <EventLogDrawer open={logOpen} onClose={() => setLogOpen(false)} events={events} />
+      <ConfirmDialog
+        action={confirm?.action ?? null}
+        detail={confirm?.action === CONFIRMABLE.MODE
+          ? `${MODES[settings.mode].label} → ${MODES[confirm.payload].label}`
+          : null}
+        onAccept={resolveConfirm}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }
