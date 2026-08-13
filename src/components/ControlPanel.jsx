@@ -1,7 +1,7 @@
 import { PATIENT_PRESETS } from '../engine/patientPresets.js'
 import { MODES } from '../engine/ventilatorModes/index.js'
 import { FLOW_PATTERNS } from '../engine/flowPatterns.js'
-import { rangeFor } from '../engine/patientCategories.js'
+import { rangeFor, COMMON_RANGES } from '../engine/patientCategories.js'
 
 function NumberField({ label, unit, value, onChange, min, max, step }) {
   const clamp = (v) => Math.min(Math.max(v, min), max)
@@ -76,7 +76,8 @@ export default function ControlPanel({
         <NumberField label="PEEP" unit="cmH₂O" value={settings.peep}
           min={peepRange.min} max={peepRange.max} step={peepRange.step}
           onChange={(v) => update({ peep: v })} />
-        <NumberField label="FiO₂" unit="%" value={settings.fio2} min={21} max={100} step={5}
+        <NumberField label="FiO₂" unit="%" value={settings.fio2}
+          min={COMMON_RANGES.fio2.min} max={COMMON_RANGES.fio2.max} step={COMMON_RANGES.fio2.step}
           onChange={(v) => update({ fio2: v })} />
         <NumberField label="Insp. pause" unit="s" value={settings.pauseTime} min={0} max={1} step={0.1}
           onChange={(v) => update({ pauseTime: v })} />

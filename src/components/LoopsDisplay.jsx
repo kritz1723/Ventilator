@@ -14,7 +14,7 @@ const LOOPS = [
     title: 'Flow — Volume',
     xKey: 'volume', yKey: 'flow',
     xLabel: 'V (mL)', yLabel: 'Flow (L/min)',
-    xMin: 0, xMax: 800, yMin: -80, yMax: 80,
+    xMin: 0, xMax: 800, yMin: -150, yMax: 150,
     token: '--flow',
   },
 ]
