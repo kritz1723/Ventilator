@@ -1075,3 +1075,39 @@
 .log-entry.log-setting, .log-entry.log-mode { border-left-color: rgba(76,196,245,0.5); }
 .log-entry.log-maneuver, .log-entry.log-capture { border-left-color: var(--mech); }
 .log-entry.log-state { border-left-color: var(--ok); }
+
+/* ---------- Waveform layout editor ---------- */
+.sweep-select { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.sweep-select select {
+  appearance: none; padding: 4px 8px; font-size: 11px;
+  background: var(--surface-inset); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); color: var(--text-secondary);
+}
+
+.layout-editor {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-soft);
+}
+.layout-hint { font-size: 11px; color: var(--text-muted); }
+.layout-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.layout-add .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.trace-edit { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
+.trace-edit select {
+  appearance: none; width: 100%; padding: 3px 6px; font-size: 10.5px;
+  background: var(--surface-1); border: 1px solid var(--border-soft);
+  border-radius: 5px; color: var(--text-secondary);
+}
+.trace-edit-buttons { display: flex; gap: 3px; }
+.trace-edit-buttons button {
+  flex: 1; padding: 2px 0; font-size: 10px; line-height: 1.4;
+  background: var(--surface-1); border: 1px solid var(--border-soft);
+  border-radius: 5px; color: var(--text-muted);
+}
+.trace-edit-buttons button:hover:not(:disabled) { color: var(--text-primary); }
+.trace-edit-buttons button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.trace-row-compact .trace-canvas { height: 78px; }
+.trace-row-compact .trace-legend { width: 74px; }

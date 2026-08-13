@@ -22,6 +22,7 @@ import { AUDIO_PAUSE_SECONDS } from './engine/alarms.js'
 import { THEMES, DEFAULT_THEME } from './config/themes.js'
 import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
 import { MODES } from './engine/ventilatorModes/index.js'
+import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
 import { createSnapshot, addSnapshot } from './engine/snapshots.js'
 import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
@@ -45,6 +46,7 @@ export default function App() {
   const [snapshots, setSnapshots] = useState([])
   const [events, setEvents] = useState([])
   const [logOpen, setLogOpen] = useState(false)
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT)
   const [now, setNow] = useState(Date.now())
 
   const patient = PATIENT_PRESETS[patientKey]
@@ -268,6 +270,8 @@ export default function App() {
             />
             <WaveformDisplay
               waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
+              layout={layout}
+              onLayoutChange={setLayout}
               frozen={frozen}
               onToggleFreeze={toggleFreeze}
               cursorIndex={cursorIndex}
