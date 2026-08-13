@@ -6,9 +6,12 @@ import { evaluateAlarms } from '../engine/alarms.js'
 import { computeMeasurements } from '../engine/measurements.js'
 import { MANEUVER, HOLD_DURATION_SECONDS, maneuverResult } from '../engine/maneuvers.js'
 
-const WAVEFORM_SECONDS = 10
 const SAMPLE_HZ = 50
-export const BUFFER_LENGTH = WAVEFORM_SECONDS * SAMPLE_HZ
+// Buffer the longest selectable sweep; the display slices the tail it needs,
+// so changing sweep length never leaves a partly filled trace.
+const MAX_WAVEFORM_SECONDS = 30
+export const BUFFER_LENGTH = MAX_WAVEFORM_SECONDS * SAMPLE_HZ
+export { SAMPLE_HZ }
 
 const INSPIRATION_PHASES = new Set(['inspiration-flow', 'inspiration-pause', 'inspiration'])
 
@@ -17,7 +20,9 @@ function labelFor(type) {
 }
 
 function createEmptyBuffer(peep = 0) {
-  return Array.from({ length: BUFFER_LENGTH }, () => ({ pressure: peep, flow: 0, volume: 0 }))
+  return Array.from({ length: BUFFER_LENGTH }, () => ({
+    pressure: peep, flow: 0, volume: 0, alveolar: peep,
+  }))
 }
 
 function emptyNumerics(peep) {
@@ -117,7 +122,8 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
     if (maneuverRef.current) {
       const held = modeStateRef.current
       const pressure = activeSettings.peep + held.volume / patientRef.current.compliance
-      const sample = { pressure, flow: 0, volume: held.volume }
+      // No flow during a hold, so airway and alveolar pressure are equal.
+      const sample = { pressure, flow: 0, volume: held.volume, alveolar: pressure }
       const buf = bufferRef.current
       buf.push(sample)
       if (buf.length > BUFFER_LENGTH) buf.shift()
@@ -166,7 +172,14 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
       }
     }
 
-    const sample = { pressure: result.pressure, flow: result.flow, volume: result.volume }
+    const sample = {
+      pressure: result.pressure,
+      flow: result.flow,
+      volume: result.volume,
+      // Alveolar pressure is the recoil of the gas held above the baseline;
+      // it differs from the airway reading by the resistive drop.
+      alveolar: activeSettings.peep + result.volume / patientRef.current.compliance,
+    }
     breathSamplesRef.current.push(sample)
 
     if (result.breathComplete) {
