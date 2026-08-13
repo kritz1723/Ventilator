@@ -9,6 +9,7 @@ import AlarmBanner from './components/AlarmBanner.jsx'
 import StandbyScreen from './components/StandbyScreen.jsx'
 import TestPanel from './components/TestPanel.jsx'
 import DeviceInfoDrawer from './components/DeviceInfoDrawer.jsx'
+import ManeuverResult from './components/ManeuverResult.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -36,7 +37,10 @@ export default function App() {
   const patient = PATIENT_PRESETS[patientKey]
   const ventilating = screen === SCREEN.VENTILATING
 
-  const { waveform, loop, numerics, measurements, alarms, reset } = useVentilatorEngine({
+  const {
+    waveform, loop, numerics, measurements, alarms, reset,
+    maneuver, startManeuver, clearManeuver,
+  } = useVentilatorEngine({
     settings,
     patient,
     ventilating,
@@ -156,7 +160,7 @@ export default function App() {
             patientKey={patientKey}
             onPatientChange={setPatientKey}
             patientCategory={patientData.category}
-            onManeuver={() => {}}
+            onManeuver={startManeuver}
             onStopVentilation={() => setScreen(SCREEN.STANDBY)}
           />
           <section className="monitor">
@@ -167,6 +171,7 @@ export default function App() {
               onPauseAudio={() => setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)}
             />
             <WaveformDisplay waveform={waveform} />
+            <ManeuverResult maneuver={maneuver} onClose={clearManeuver} />
             <div className="monitor-lower">
               <NumericsPanel
                 numerics={numerics}

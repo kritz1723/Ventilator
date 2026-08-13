@@ -914,3 +914,20 @@
 .symbol-entry div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .symbol-entry b { font-size: 12.5px; }
 .symbol-entry span { font-size: 10.5px; color: var(--text-muted); }
+
+/* ---------- Maneuver readout ---------- */
+.maneuver-result { padding: 12px 16px 14px; }
+.maneuver-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.maneuver-readings { display: flex; gap: 10px; flex-wrap: wrap; }
+.maneuver-reading {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 9px 14px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-soft);
+}
+.maneuver-reading-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.maneuver-reading-value { font-size: 20px; font-weight: 700; color: var(--mech); }
+.maneuver-reading-unit { font-size: 10px; color: var(--text-muted); }
+.maneuver-pending { margin: 0 0 8px; font-size: 12px; color: var(--warning); }
