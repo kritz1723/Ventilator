@@ -1,19 +1,49 @@
 :root {
-  --bg: #0b0e14;
-  --panel-bg: #12151d;
-  --panel-border: #262b38;
-  --text: #d6dae3;
-  --text-dim: #8b91a1;
-  --accent: #5ec8f2;
-  --danger: #ff5c5c;
-  --warning: #f2c94c;
-  --ok: #7be08b;
+  /* Surfaces */
+  --bg-base: #070910;
+  --bg-glow: #0d1220;
+  --surface-1: rgba(20, 25, 38, 0.72);
+  --surface-2: rgba(28, 34, 50, 0.6);
+  --surface-inset: #0a0d16;
+
+  /* Lines */
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  /* Type */
+  --text-primary: #e8ecf5;
+  --text-secondary: #9aa3b8;
+  --text-muted: #5f6980;
+
+  /* Channel colors */
+  --paw: #4cc4f5;
+  --flow: #5fe08f;
+  --volume: #f5c85c;
+
+  --accent: #4cc4f5;
+  --danger: #ff5f6d;
+  --warning: #ffbe4d;
+  --ok: #5fe08f;
+
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 7px;
+
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 12px 32px -12px rgba(0, 0, 0, 0.9);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
+    monospace;
 
   color-scheme: dark;
-  color: var(--text);
-  background: var(--bg);
-  font: 15px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text-primary);
+  font: 15px/1.45 var(--font-sans);
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -22,6 +52,12 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, var(--bg-glow), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(76, 196, 245, 0.06), transparent 55%),
+    var(--bg-base);
+  background-attachment: fixed;
 }
 
 button,
@@ -29,4 +65,18 @@ input,
 select {
   font: inherit;
   color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(76, 196, 245, 0.28);
+}
+
+/* Tabular numerals everywhere numbers matter */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }

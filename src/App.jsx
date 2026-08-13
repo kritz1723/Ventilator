@@ -20,9 +20,25 @@ export default function App() {
     <div className="app">
       <Disclaimer />
       <header className="app-header">
-        <h1>ICU Ventilator Simulator</h1>
-        <span className="app-subtitle">Educational / training simulation — single-compartment lung model</span>
+        <div className="brand">
+          <div className="brand-mark" aria-hidden="true">
+            <span />
+          </div>
+          <div className="brand-text">
+            <h1>ICU Ventilator Simulator</h1>
+            <p>Single-compartment lung model · educational simulation</p>
+          </div>
+        </div>
+        <div className="header-status">
+          <span className={running ? 'status-chip status-running' : 'status-chip status-paused'}>
+            <span className="status-dot" />
+            {running ? 'Ventilating' : 'Paused'}
+          </span>
+          <span className="status-chip status-mode">{settings.mode === 'VC' ? 'Volume Control' : 'Pressure Control'}</span>
+          <span className="status-chip status-patient">{patient.label}</span>
+        </div>
       </header>
+
       <main className="app-main">
         <ControlPanel
           settings={settings}
