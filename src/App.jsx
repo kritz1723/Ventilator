@@ -10,6 +10,7 @@ import StandbyScreen from './components/StandbyScreen.jsx'
 import TestPanel from './components/TestPanel.jsx'
 import DeviceInfoDrawer from './components/DeviceInfoDrawer.jsx'
 import ManeuverResult from './components/ManeuverResult.jsx'
+import AppFooter from './components/AppFooter.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -96,6 +97,7 @@ export default function App() {
             {testStatus.powerOn ? 'Continue to standby' : 'Running self test…'}
           </button>
         </div>
+        <AppFooter />
       </div>
     )
   }
@@ -186,6 +188,7 @@ export default function App() {
         </main>
       )}
 
+      <AppFooter />
       <DeviceInfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
     </div>
   )
