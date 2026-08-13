@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 const TRACES = [
   { key: 'pressure', label: 'Paw', unit: 'cmH₂O', token: '--paw', min: -5, max: 45 },
-  { key: 'flow', label: 'Flow', unit: 'L/min', token: '--flow', min: -80, max: 80 },
+  { key: 'flow', label: 'Flow', unit: 'L/min', token: '--flow', min: -150, max: 150 },
   { key: 'volume', label: 'Volume', unit: 'mL', token: '--volume', min: 0, max: 800 },
 ]
 
