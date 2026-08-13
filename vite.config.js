@@ -4,5 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_BASE_PATH || '/',
+  // Relative base so the built site works at any path (GitHub Pages
+  // project subpath, a custom domain, or opened from disk).
+  base: './',
 })

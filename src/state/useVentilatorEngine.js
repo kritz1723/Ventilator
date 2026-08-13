@@ -12,8 +12,8 @@ const MODES = { VC: volumeControl, PC: pressureControl }
 
 const INSPIRATION_PHASES = new Set(['inspiration-flow', 'inspiration-pause', 'inspiration'])
 
-function createEmptyBuffer() {
-  return Array.from({ length: BUFFER_LENGTH }, () => ({ pressure: 0, flow: 0, volume: 0 }))
+function createEmptyBuffer(peep = 0) {
+  return Array.from({ length: BUFFER_LENGTH }, () => ({ pressure: peep, flow: 0, volume: 0 }))
 }
 
 function emptyNumerics(peep) {
@@ -34,7 +34,7 @@ function emptyNumerics(peep) {
 // so the integration is not affected by render timing.
 export function useVentilatorEngine({ settings, patient }) {
   const [running, setRunning] = useState(true)
-  const [waveform, setWaveform] = useState(() => createEmptyBuffer())
+  const [waveform, setWaveform] = useState(() => createEmptyBuffer(settings.peep))
   const [numerics, setNumerics] = useState(() => emptyNumerics(settings.peep))
   const [alarms, setAlarms] = useState([])
 
@@ -45,7 +45,7 @@ export function useVentilatorEngine({ settings, patient }) {
 
   const clockRef = useRef(null)
   const modeStateRef = useRef(MODES[settings.mode].initialState)
-  const bufferRef = useRef(createEmptyBuffer())
+  const bufferRef = useRef(createEmptyBuffer(settings.peep))
   const timeRef = useRef(0)
   const breathPeakRef = useRef(settings.peep)
   const plateauRef = useRef(settings.peep)
@@ -148,12 +148,12 @@ export function useVentilatorEngine({ settings, patient }) {
 
   const reset = useCallback(() => {
     modeStateRef.current = MODES[activeModeNameRef.current].initialState
-    bufferRef.current = createEmptyBuffer()
+    bufferRef.current = createEmptyBuffer(settingsRef.current.peep)
     timeRef.current = 0
     lastBreathTimeRef.current = 0
     breathIntervalsRef.current = []
     resetBreathTracking()
-    setWaveform(createEmptyBuffer())
+    setWaveform(createEmptyBuffer(settingsRef.current.peep))
     setNumerics(emptyNumerics(settingsRef.current.peep))
     setAlarms([])
   }, [resetBreathTracking])
