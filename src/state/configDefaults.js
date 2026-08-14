@@ -33,6 +33,11 @@ export const CONFIG_DEFAULTS = {
   language: DEFAULT_LANGUAGE,
   workspace: DEFAULT_WORKSPACE,
   displayScale: DEFAULT_DISPLAY_SCALE,
+  // Audio enablement is configuration, not running state: an operator who
+  // turned sound off means it to stay off across a reload. The audio *pause*
+  // is running state and is deliberately not stored — a pause that survived
+  // a reload would be an off switch wearing a countdown.
+  audioEnabled: true,
 }
 
 export const CONFIG_FIELDS = Object.keys(CONFIG_DEFAULTS)
