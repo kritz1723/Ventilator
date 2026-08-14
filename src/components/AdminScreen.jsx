@@ -4,9 +4,11 @@ import { RISKS, riskById, rpn } from '../docs/risks.js'
 import { USER_PROFILES } from '../docs/userProfiles.js'
 import { TEST_CASES, testCaseById, automatedCount } from '../docs/testCases.js'
 import LicensingTab from './LicensingTab.jsx'
+import UnitsTab from './UnitsTab.jsx'
 
 const TABS = [
   { id: 'licensing', label: 'Features' },
+  { id: 'units', label: 'Units' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'risks', label: 'Risk / DFMEA' },
   { id: 'tests', label: 'Test cases' },
@@ -267,7 +269,9 @@ function ProfilesTab() {
   )
 }
 
-export default function AdminScreen({ onExit, licence, onLicenceChange, canEdit, blockedReason }) {
+export default function AdminScreen({
+  onExit, licence, onLicenceChange, canEdit, blockedReason, units, onUnitsChange,
+}) {
   const [tab, setTab] = useState('licensing')
 
   return (
@@ -304,6 +308,7 @@ export default function AdminScreen({ onExit, licence, onLicenceChange, canEdit,
             blockedReason={blockedReason}
           />
         )}
+        {tab === 'units' && <UnitsTab units={units} onUnitsChange={onUnitsChange} />}
         {tab === 'requirements' && <RequirementsTab />}
         {tab === 'risks' && <RisksTab />}
         {tab === 'tests' && <TestsTab />}

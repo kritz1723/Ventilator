@@ -1296,3 +1296,17 @@
 .licence-switch.on { background: rgba(95,224,143,0.2); border-color: rgba(95,224,143,0.5); }
 .licence-switch.on .licence-knob { transform: translateX(18px); background: var(--ok); }
 .licence-switch:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- Units ---------- */
+.unit-row {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 14px; margin-bottom: 6px; border-radius: var(--radius-md);
+  background: var(--surface-1); border: 1px solid var(--border-soft);
+}
+.unit-info { display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+.unit-options { display: flex; gap: 5px; flex-wrap: wrap; }
+.unit-sample {
+  margin-left: auto; font-size: 14px; font-weight: 700; color: var(--accent);
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-soft);
+}

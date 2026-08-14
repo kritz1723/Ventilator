@@ -1,32 +1,37 @@
 // Every value the monitor can display. The operator chooses which of these
 // appear on the numerics panel, so the catalogue carries both how to read a
 // value out of the engine and how to format it.
+//
+// Entries whose unit is operator-selectable also expose `quantity` and a
+// `raw` reader returning the canonical value, so the panel can convert at
+// display time. Entries without them are dimensionless or have a fixed unit
+// (a ratio, a percentage, a time) and are read through `read` directly.
 
 const fmt = (v, digits = 0) => (v == null || Number.isNaN(v) ? '––' : v.toFixed(digits))
 
 export const MEASUREMENT_CATALOG = [
   {
-    id: 'ppeak', label: 'Ppeak', unit: 'cmH₂O', tone: 'paw', group: 'Pressure',
+    id: 'ppeak', label: 'Ppeak', unit: 'cmH₂O', quantity: 'pressure', raw: ({ numerics, measurements }) => numerics.peakPressure, tone: 'paw', group: 'Pressure',
     read: ({ numerics }) => fmt(numerics.peakPressure),
   },
   {
-    id: 'pplat', label: 'Pplat', unit: 'cmH₂O', tone: 'paw', group: 'Pressure',
+    id: 'pplat', label: 'Pplat', unit: 'cmH₂O', quantity: 'pressure', raw: ({ numerics, measurements }) => numerics.plateauPressure, tone: 'paw', group: 'Pressure',
     read: ({ numerics }) => fmt(numerics.plateauPressure),
   },
   {
-    id: 'pmean', label: 'Pmean', unit: 'cmH₂O', tone: 'paw', group: 'Pressure',
+    id: 'pmean', label: 'Pmean', unit: 'cmH₂O', quantity: 'pressure', raw: ({ numerics, measurements }) => numerics.meanPressure, tone: 'paw', group: 'Pressure',
     read: ({ numerics }) => fmt(numerics.meanPressure),
   },
   {
-    id: 'peep', label: 'PEEP', unit: 'cmH₂O', tone: 'paw', group: 'Pressure',
+    id: 'peep', label: 'PEEP', unit: 'cmH₂O', quantity: 'pressure', raw: ({ numerics, measurements }) => numerics.peep, tone: 'paw', group: 'Pressure',
     read: ({ numerics }) => fmt(numerics.peep),
   },
   {
-    id: 'driving', label: 'ΔP', unit: 'cmH₂O', tone: 'paw', group: 'Pressure',
+    id: 'driving', label: 'ΔP', unit: 'cmH₂O', quantity: 'pressure', raw: ({ numerics, measurements }) => measurements.drivingPressure, tone: 'paw', group: 'Pressure',
     read: ({ measurements }) => fmt(measurements.drivingPressure),
   },
   {
-    id: 'vte', label: 'Vte', unit: 'mL', tone: 'volume', group: 'Volume',
+    id: 'vte', label: 'Vte', unit: 'mL', quantity: 'volume', raw: ({ numerics, measurements }) => numerics.tidalVolumeExhaled, tone: 'volume', group: 'Volume',
     read: ({ numerics }) => fmt(numerics.tidalVolumeExhaled),
   },
   {
@@ -38,7 +43,7 @@ export const MEASUREMENT_CATALOG = [
     read: ({ numerics }) => fmt(numerics.measuredRR),
   },
   {
-    id: 'peakflow', label: 'Peak flow', unit: 'L/min', tone: 'flow', group: 'Flow',
+    id: 'peakflow', label: 'Peak flow', unit: 'L/min', quantity: 'flow', raw: ({ numerics, measurements }) => numerics.peakFlow, tone: 'flow', group: 'Flow',
     read: ({ numerics }) => fmt(numerics.peakFlow),
   },
   {
