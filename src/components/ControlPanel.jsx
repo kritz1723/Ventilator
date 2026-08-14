@@ -1,5 +1,6 @@
 import { PATIENT_PRESETS } from '../engine/patientPresets.js'
 import { MODES } from '../engine/ventilatorModes/index.js'
+import { EFFORT_PRESETS } from '../engine/spontaneousEffort.js'
 import { FLOW_PATTERNS } from '../engine/flowPatterns.js'
 import { rangeFor, COMMON_RANGES } from '../engine/patientCategories.js'
 
@@ -83,6 +84,14 @@ export default function ControlPanel({
           onChange={(v) => update({ pauseTime: v })} />
         <NumberField label="Trigger" unit="L/min" value={settings.triggerFlow} min={0.5} max={15} step={0.5}
           onChange={(v) => update({ triggerFlow: v })} />
+        {mode.supportsPressureSupport && (
+          <NumberField label="P support" unit="cmH₂O" value={settings.pSupport} min={0} max={40} step={1}
+            onChange={(v) => update({ pSupport: v })} />
+        )}
+        {mode.supportsCycleOff && (
+          <NumberField label="Cycle off" unit="%" value={settings.cycleOffPercent} min={5} max={70} step={5}
+            onChange={(v) => update({ cycleOffPercent: v })} />
+        )}
       </section>
 
       {mode.supportsFlowPattern && (
@@ -148,6 +157,22 @@ export default function ControlPanel({
           <span>C <b className="tnum">{PATIENT_PRESETS[patientKey].compliance}</b> mL/cmH₂O</span>
           <span>R <b className="tnum">{PATIENT_PRESETS[patientKey].resistance}</b> cmH₂O/L/s</span>
         </div>
+        <label className="field field-stacked">
+          <span className="field-label">Spontaneous effort</span>
+          <div className="select-wrap">
+            <select value={settings.effort} onChange={(e) => update({ effort: e.target.value })}>
+              {Object.values(EFFORT_PRESETS).map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        </label>
+        {mode.spontaneous && settings.effort === 'none' && (
+          <p className="preset-warn">
+            This mode is patient-triggered. With no effort the device falls back to
+            its apnea backup.
+          </p>
+        )}
         <p className="preset-note">Illustrative values — not clinical reference data.</p>
       </section>
 
