@@ -19,6 +19,11 @@ import PendingChangesBar from './components/PendingChangesBar.jsx'
 import AutosetProposal from './components/AutosetProposal.jsx'
 import LungIllustration from './components/LungIllustration.jsx'
 import ScreenLockOverlay from './components/ScreenLockOverlay.jsx'
+import StatusBar from './components/StatusBar.jsx'
+import NavRail from './components/NavRail.jsx'
+import NumericRail from './components/NumericRail.jsx'
+import LungHero from './components/LungHero.jsx'
+import SettingTiles from './components/SettingTiles.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -82,6 +87,7 @@ export default function App() {
   const [autoset, setAutoset] = useState(null)
   const [flush, setFlush] = useState(null)
   const [lockState, setLockState] = useState(LOCK_STATE.UNLOCKED)
+  const [page, setPage] = useState('home')
   const [now, setNow] = useState(Date.now())
 
   const t = makeTranslator(language)
@@ -320,6 +326,7 @@ export default function App() {
   return (
     <div className="app">
       <Disclaimer t={t} />
+      {!ventilating && (
       <header className="app-header">
         <div className="brand">
           <BrandMark />
@@ -390,6 +397,7 @@ export default function App() {
           </button>
         </div>
       </header>
+      )}
 
       {screen === SCREEN.ADMIN ? (
         <AdminScreen
@@ -428,133 +436,204 @@ export default function App() {
           }}
         />
       ) : (
-        <main className="app-main">
-          <ControlPanel
-            settings={editedSettings}
+        <main className="device-shell">
+          <StatusBar
+            settings={settings}
             availableModes={availableModes}
-            features={{
-              maneuvers: isEnabled(licence, 'maneuvers'),
-              flowPatterns: isEnabled(licence, 'flowPatterns'),
-            }}
-            onSettingsChange={changeSettings}
-            patientKey={patientKey}
-            onPatientChange={setPatientKey}
             patientCategory={patientData.category}
-            onManeuver={(type) => {
-              startManeuver(type)
-              log({
-                category: EVENT_CATEGORY.MANEUVER,
-                message: type === 'inspHold' ? 'Inspiratory hold requested' : 'Expiratory hold requested',
-              })
-            }}
+            ventilating={ventilating}
+            alarms={alarms}
+            modeLocked={false}
+            onModeChange={(next) => changeSettings({ ...editedSettings, mode: next })}
+            themes={THEMES}
+            theme={theme}
+            onThemeChange={setTheme}
+            onOpenLog={() => setLogOpen(true)}
+            onOpenInfo={() => setInfoOpen(true)}
+            logCount={events.length}
             t={t}
-            onAutoset={requestAutoset}
-            setupLocked={setupLocked}
-            holdState={holdState}
-            onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
-          <section className="monitor">
-            <div className="oxygen-row">
-              <button
-                type="button"
-                className={flushActive ? 'btn btn-flush active' : 'btn btn-flush'}
-                onClick={() => {
-                  if (flushActive) return
-                  setFlush(startFlush())
+
+          <div className="shell-body">
+            <NumericRail
+              numerics={numerics}
+              measurements={measurements}
+              settings={settings}
+              selected={selectedMeasurements}
+              units={units}
+            />
+
+            <div className="shell-centre">
+              <AlarmBanner
+                alarms={alarms}
+                audioPaused={audioPaused}
+                pauseRemaining={pauseRemaining}
+                onPauseAudio={() => {
+                  setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)
                   log({
-                    category: EVENT_CATEGORY.SETTING,
-                    message: `100 % oxygen started for ${FLUSH_DURATION_SECONDS}s`,
-                    detail: `Set FiO₂ remains ${settings.fio2} %`,
+                    category: EVENT_CATEGORY.ALARM,
+                    message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
                   })
                 }}
-              >
-                {flushActive ? `100 % O₂ · ${flushLeft}s` : '100 % O₂ · 2 min'}
-              </button>
-              {flushActive && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-tiny"
-                  onClick={() => {
-                    setFlush(null)
-                    log({ category: EVENT_CATEGORY.SETTING, message: '100 % oxygen ended early' })
-                  }}
-                >End now</button>
+              />
+              <AutosetProposal
+                proposal={autoset}
+                onAccept={acceptAutoset}
+                onCancel={() => setAutoset(null)}
+              />
+              <PendingChangesBar
+                changes={pendingDiff(settings, pendingSettings)}
+                onAccept={acceptPending}
+                onCancel={cancelPending}
+              />
+
+              {page === 'home' && (
+                <div className="page-home">
+                  <LungHero
+                    live={live}
+                    settings={settings}
+                    patient={patient}
+                    spo2={spo2}
+                    numerics={numerics}
+                    holdState={holdState}
+                    frozen={frozen}
+                    onToggleFreeze={toggleFreeze}
+                    t={t}
+                  />
+                  <div className="page-home-right">
+                    <WaveformDisplay
+                      waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
+                      t={t}
+                      layout={layout}
+                      onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
+                      frozen={frozen}
+                      onToggleFreeze={toggleFreeze}
+                      cursors={cursors}
+                      onCursorsChange={setCursors}
+                    />
+                    {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
+                  </div>
+                </div>
               )}
-              {flushActive && (
-                <span className="oxygen-note">
-                  Delivering {deliveredFio2} % — set value unchanged at {settings.fio2} %
-                </span>
+
+              {page === 'alarms' && (
+                <div className="page-stack">
+                  <div className="oxygen-row">
+                    <button
+                      type="button"
+                      className={flushActive ? 'btn btn-flush active' : 'btn btn-flush'}
+                      onClick={() => {
+                        if (flushActive) return
+                        setFlush(startFlush())
+                        log({
+                          category: EVENT_CATEGORY.SETTING,
+                          message: `100 % oxygen started for ${FLUSH_DURATION_SECONDS}s`,
+                          detail: `Set FiO₂ remains ${settings.fio2} %`,
+                        })
+                      }}
+                    >
+                      {flushActive ? `100 % O₂ · ${flushLeft}s` : '100 % O₂ · 2 min'}
+                    </button>
+                    {flushActive && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-tiny"
+                        onClick={() => {
+                          setFlush(null)
+                          log({ category: EVENT_CATEGORY.SETTING, message: '100 % oxygen ended early' })
+                        }}
+                      >End now</button>
+                    )}
+                  </div>
+                  <ControlPanel
+                    settings={editedSettings}
+                    availableModes={availableModes}
+                    features={{ maneuvers: false, flowPatterns: false }}
+                    onSettingsChange={changeSettings}
+                    patientKey={patientKey}
+                    onPatientChange={setPatientKey}
+                    patientCategory={patientData.category}
+                    onManeuver={() => {}}
+                    t={t}
+                    onAutoset={requestAutoset}
+                    setupLocked={setupLocked}
+                    holdState={holdState}
+                    alarmsOnly
+                  />
+                </div>
+              )}
+
+              {page === 'trends' && (
+                <div className="page-stack">
+                  {isEnabled(licence, 'captures') && (
+                    <SnapshotPanel
+                      snapshots={snapshots}
+                      onCapture={capture}
+                      onClear={() => setSnapshots([])}
+                      numerics={numerics}
+                      measurements={measurements}
+                      settings={settings}
+                    />
+                  )}
+                  <NumericsPanel
+                    numerics={numerics}
+                    measurements={measurements}
+                    settings={settings}
+                    selected={selectedMeasurements}
+                    onSelectedChange={setSelectedMeasurements}
+                    units={units}
+                  />
+                </div>
+              )}
+
+              {page === 'settings' && (
+                <div className="page-settings">
+                  <ControlPanel
+                    settings={editedSettings}
+                    availableModes={availableModes}
+                    features={{
+                      maneuvers: isEnabled(licence, 'maneuvers'),
+                      flowPatterns: isEnabled(licence, 'flowPatterns'),
+                    }}
+                    onSettingsChange={changeSettings}
+                    patientKey={patientKey}
+                    onPatientChange={setPatientKey}
+                    patientCategory={patientData.category}
+                    onManeuver={(type) => {
+                      startManeuver(type)
+                      log({
+                        category: EVENT_CATEGORY.MANEUVER,
+                        message: type === 'inspHold' ? 'Inspiratory hold requested' : 'Expiratory hold requested',
+                      })
+                    }}
+                    t={t}
+                    onAutoset={requestAutoset}
+                    setupLocked={setupLocked}
+                    holdState={holdState}
+                    onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
+                  />
+                </div>
               )}
             </div>
-            <AlarmBanner
-              alarms={alarms}
-              audioPaused={audioPaused}
-              pauseRemaining={pauseRemaining}
-              onPauseAudio={() => {
-                setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)
-                log({
-                  category: EVENT_CATEGORY.ALARM,
-                  message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
-                })
+
+            <NavRail
+              page={page}
+              onPageChange={setPage}
+              alarmCount={alarms.length}
+              onLock={() => {
+                setLockState(LOCK_STATE.LOCKED)
+                log({ category: EVENT_CATEGORY.STATE, message: 'Screen locked' })
               }}
             />
-            <AutosetProposal
-              proposal={autoset}
-              onAccept={acceptAutoset}
-              onCancel={() => setAutoset(null)}
-            />
-            <PendingChangesBar
-              changes={pendingDiff(settings, pendingSettings)}
-              onAccept={acceptPending}
-              onCancel={cancelPending}
-            />
-            <WaveformDisplay
-              waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
-              t={t}
-              layout={layout}
-              onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
-              frozen={frozen}
-              onToggleFreeze={toggleFreeze}
-              cursors={cursors}
-              onCursorsChange={setCursors}
-            />
-            <ManeuverResult maneuver={maneuver} onClose={clearManeuver} />
-            <div className="monitor-lower">
-              <NumericsPanel
-                numerics={numerics}
-                measurements={measurements}
-                settings={settings}
-                selected={selectedMeasurements}
-                onSelectedChange={setSelectedMeasurements}
-                units={units}
-              />
-              <div className="lung-column panel">
-                <span className="panel-title">Simulated lung</span>
-                <LungIllustration
-                  volume={live.volume}
-                  tidalVolume={settings.tidalVolume}
-                  spo2={spo2}
-                  compliance={patient.compliance}
-                  phase={live.phase}
-                />
-                <div className="lung-stats">
-                  <span>{patient.label}</span>
-                  <span>C {patient.compliance} · R {patient.resistance}</span>
-                </div>
-              </div>
-              {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
-            </div>
-            {isEnabled(licence, 'captures') && (
-              <SnapshotPanel
-                snapshots={snapshots}
-                onCapture={capture}
-                onClear={() => setSnapshots([])}
-                numerics={numerics}
-                measurements={measurements}
-                settings={settings}
-              />
-            )}
-          </section>
+          </div>
+
+          <SettingTiles
+            settings={editedSettings}
+            patientCategory={patientData.category}
+            onChange={changeSettings}
+            disabled={screenLocked}
+            pendingKeys={pendingDiff(settings, pendingSettings).map((c) => c.key)}
+          />
         </main>
       )}
 

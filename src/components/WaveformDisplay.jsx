@@ -30,7 +30,7 @@ function niceTicks(min, max) {
   return [...new Set(ticks)].sort((a, b) => a - b)
 }
 
-function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
+function draw(canvas, data, channel, scale, sweepSeconds, cursors, showAxis = false) {
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
   const w = canvas.clientWidth
@@ -49,18 +49,37 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
   const plotW = w - padLeft
   const yFor = (v) => {
     const clamped = Math.min(Math.max(v, scale.min), scale.max)
-    return h - ((clamped - scale.min) / (scale.max - scale.min)) * h
+    const usable = h - (showAxis ? 14 : 0)
+    return usable - ((clamped - scale.min) / (scale.max - scale.min)) * usable
   }
 
-  // One vertical gridline per second of the selected sweep.
+  // Time gridlines, spaced so the labels stay legible at any sweep length.
+  const padBottom = showAxis ? 14 : 0
+  const plotH = h - padBottom
+  const tickEvery = sweepSeconds <= 10 ? 1 : sweepSeconds <= 20 ? 2 : 5
   ctx.strokeStyle = colors.grid
   ctx.lineWidth = 1
-  for (let s = 1; s < sweepSeconds; s += 1) {
-    const x = padLeft + (s / sweepSeconds) * plotW
+  for (let sec = tickEvery; sec < sweepSeconds; sec += tickEvery) {
+    const x = padLeft + (sec / sweepSeconds) * plotW
     ctx.beginPath()
     ctx.moveTo(x, 0)
-    ctx.lineTo(x, h)
+    ctx.lineTo(x, plotH)
     ctx.stroke()
+  }
+
+  // Explicit time values along the x axis, counted back from now, so a
+  // feature on the trace can be placed in time without measuring it.
+  if (showAxis) {
+    ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.fillStyle = colors.axis
+    ctx.textBaseline = 'bottom'
+    for (let sec = 0; sec <= sweepSeconds; sec += tickEvery) {
+      const x = padLeft + (sec / sweepSeconds) * plotW
+      ctx.textAlign = sec === 0 ? 'left' : sec === sweepSeconds ? 'right' : 'center'
+      ctx.fillText(`${sec - sweepSeconds}s`, x, h - 2)
+    }
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
   }
 
   ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace'
@@ -128,7 +147,7 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
   if (active.length === 2) {
     const [a, b] = active.map(clamp).sort((x, y) => x - y)
     ctx.fillStyle = withAlpha(colors.trace, 0.09)
-    ctx.fillRect(xFor(a), 0, xFor(b) - xFor(a), h)
+    ctx.fillRect(xFor(a), 0, xFor(b) - xFor(a), h - (showAxis ? 14 : 0))
   }
 
   active.forEach((raw, n) => {
@@ -142,7 +161,7 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
     ctx.setLineDash(n === 0 ? [] : [4, 3])
     ctx.beginPath()
     ctx.moveTo(cx, 0)
-    ctx.lineTo(cx, h)
+    ctx.lineTo(cx, h - (showAxis ? 14 : 0))
     ctx.stroke()
     ctx.setLineDash([])
 
@@ -161,6 +180,7 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
 function TraceRow({
   data, channel, scaleIndex, sweepSeconds, cursors, onScrub,
   editing, onScaleChange, onRemove, onMoveUp, onMoveDown, compact, canRemove,
+  showAxis,
 }) {
   const canvasRef = useRef(null)
   const scale = scaleFor(channel.id, scaleIndex)
@@ -168,12 +188,12 @@ function TraceRow({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return undefined
-    const render = () => draw(canvas, data, channel, scale, sweepSeconds, cursors)
+    const render = () => draw(canvas, data, channel, scale, sweepSeconds, cursors, showAxis)
     render()
     const ro = new ResizeObserver(render)
     ro.observe(canvas)
     return () => ro.disconnect()
-  }, [data, channel, scale, sweepSeconds, cursors])
+  }, [data, channel, scale, sweepSeconds, cursors, showAxis])
 
   const handlePointer = (e) => {
     if (!onScrub) return
@@ -211,17 +231,25 @@ function TraceRow({
             Δ {delta > 0 ? '+' : ''}{delta.toFixed(1)}
           </span>
         )}
+        {onScaleChange && (
+          <div className="y-zoom" role="group" aria-label={`${channel.label} vertical scale`}>
+            <button
+              type="button"
+              aria-label={`Reduce ${channel.label} scale`}
+              disabled={scaleIndex <= 0}
+              onClick={() => onScaleChange(scaleIndex - 1)}
+            >−</button>
+            <span className="y-zoom-label tnum">{scale.label}</span>
+            <button
+              type="button"
+              aria-label={`Expand ${channel.label} scale`}
+              disabled={scaleIndex >= channel.scales.length - 1}
+              onClick={() => onScaleChange(scaleIndex + 1)}
+            >+</button>
+          </div>
+        )}
         {editing && (
           <div className="trace-edit">
-            <select
-              value={scaleIndex}
-              onChange={(e) => onScaleChange(Number(e.target.value))}
-              aria-label={`${channel.label} scale`}
-            >
-              {channel.scales.map((s, i) => (
-                <option key={s.label} value={i}>{s.label}</option>
-              ))}
-            </select>
             <div className="trace-edit-buttons">
               <button type="button" onClick={onMoveUp} aria-label={`Move ${channel.label} up`}>↑</button>
               <button type="button" onClick={onMoveDown} aria-label={`Move ${channel.label} down`}>↓</button>
@@ -277,6 +305,7 @@ export default function WaveformDisplay({
     else onCursorsChange([index, null])
   }
 
+  const sweepIndex = Math.max(0, SWEEP_OPTIONS.indexOf(sweepSeconds))
   const setTraces = (next) => onLayoutChange({ ...layout, traces: next })
 
   const addTrace = (id) => {
@@ -305,16 +334,24 @@ export default function WaveformDisplay({
               onClick={() => onCursorsChange([null, null])}
             >Clear cursors</button>
           )}
-          <label className="sweep-select">
-            <span>{t('field.sweep')}</span>
-            <select
-              value={sweepSeconds}
-              disabled={!onLayoutChange}
-              onChange={(e) => onLayoutChange({ ...layout, sweepSeconds: Number(e.target.value) })}
-            >
-              {SWEEP_OPTIONS.map((s) => <option key={s} value={s}>{s}s</option>)}
-            </select>
-          </label>
+          {/* Time base is adjusted on the graph rather than inside a layout
+              editor, because changing it is part of reading the trace. */}
+          <div className="x-zoom" role="group" aria-label="Time base">
+            <span className="x-zoom-title">{t('field.sweep')}</span>
+            <button
+              type="button"
+              aria-label="Shorter time base"
+              disabled={!onLayoutChange || sweepIndex <= 0}
+              onClick={() => onLayoutChange({ ...layout, sweepSeconds: SWEEP_OPTIONS[sweepIndex - 1] })}
+            >−</button>
+            <span className="x-zoom-label tnum">{sweepSeconds}s</span>
+            <button
+              type="button"
+              aria-label="Longer time base"
+              disabled={!onLayoutChange || sweepIndex >= SWEEP_OPTIONS.length - 1}
+              onClick={() => onLayoutChange({ ...layout, sweepSeconds: SWEEP_OPTIONS[sweepIndex + 1] })}
+            >+</button>
+          </div>
           {onLayoutChange && (
             <button
               type="button"
@@ -378,8 +415,11 @@ export default function WaveformDisplay({
             onScrub={frozen ? placeCursor : null}
             editing={editing}
             compact={traces.length >= 5}
+            showAxis={i === traces.length - 1}
             canRemove={traces.length > MIN_TRACES}
-            onScaleChange={(scale) => setTraces(traces.map((x, j) => (j === i ? { ...x, scale } : x)))}
+            onScaleChange={onLayoutChange
+              ? (scale) => setTraces(traces.map((x, j) => (j === i ? { ...x, scale } : x)))
+              : null}
             onRemove={() => {
               if (traces.length <= MIN_TRACES) return
               setTraces(traces.filter((_, j) => j !== i))
