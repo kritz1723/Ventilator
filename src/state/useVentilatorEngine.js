@@ -6,6 +6,7 @@ import { evaluateAlarms } from '../engine/alarms.js'
 import { computeMeasurements } from '../engine/measurements.js'
 import { MANEUVER, HOLD_DURATION_SECONDS, maneuverResult } from '../engine/maneuvers.js'
 import { EFFORT_PRESETS, DEFAULT_EFFORT } from '../engine/spontaneousEffort.js'
+import { targetSpo2, stepSpo2 } from '../engine/oxygenation.js'
 
 const SAMPLE_HZ = 50
 // Buffer the longest selectable sweep; the display slices the tail it needs,
@@ -50,17 +51,21 @@ const emptyMeasurements = {
 // lung model each tick, and derives the waveform buffer, breath loop,
 // numerics and mechanics the UI reads. The fixed-step physics runs inside
 // refs (not React state) so integration is unaffected by render timing.
-export function useVentilatorEngine({ settings, patient, ventilating, technical }) {
+export function useVentilatorEngine({ settings, patient, ventilating, technical, deliveredFio2 }) {
   const [waveform, setWaveform] = useState(() => createEmptyBuffer(settings.peep))
   const [loop, setLoop] = useState([])
   const [numerics, setNumerics] = useState(() => emptyNumerics(settings.peep))
   const [measurements, setMeasurements] = useState(emptyMeasurements)
   const [alarms, setAlarms] = useState([])
+  const [spo2, setSpo2] = useState(null)
   const [maneuver, setManeuver] = useState(null)
 
   const maneuverRef = useRef(null)
   const pendingManeuverRef = useRef(null)
   const maneuverElapsedRef = useRef(0)
+  const spo2Ref = useRef(null)
+  const fio2Ref = useRef(settings.fio2)
+  fio2Ref.current = deliveredFio2 ?? settings.fio2
   const settingsRef = useRef(settings)
   const patientRef = useRef(patient)
   const technicalRef = useRef(technical)
@@ -234,6 +239,19 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
       resetBreathTracking()
     }
 
+    // Oxygenation follows the delivered FiO2 with a lag, so it is advanced
+    // every tick rather than recomputed per breath.
+    const mv = (deliveredVolumeRef.current * 60) / 1000
+    spo2Ref.current = stepSpo2(
+      spo2Ref.current,
+      targetSpo2({
+        fio2: fio2Ref.current,
+        minuteVolume: mv > 0 ? mv : 6,
+        compliance: patientRef.current.compliance,
+      }),
+      dt,
+    )
+
     const buffer = bufferRef.current
     buffer.push(sample)
     if (buffer.length > BUFFER_LENGTH) buffer.shift()
@@ -247,6 +265,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
 
     const render = () => {
       setWaveform([...bufferRef.current])
+      setSpo2(spo2Ref.current)
       frameHandle = requestAnimationFrame(render)
     }
 
@@ -299,6 +318,8 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
     setNumerics(emptyNumerics(peep))
     setMeasurements(emptyMeasurements)
     setAlarms([])
+    spo2Ref.current = null
+    setSpo2(null)
     setManeuver(null)
     maneuverRef.current = null
     pendingManeuverRef.current = null
@@ -306,7 +327,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
   }, [resetBreathTracking])
 
   return {
-    waveform, loop, numerics, measurements, alarms, reset,
+    waveform, loop, numerics, measurements, alarms, spo2, reset,
     maneuver, startManeuver, clearManeuver,
   }
 }

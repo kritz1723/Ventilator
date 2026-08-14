@@ -38,6 +38,9 @@ import {
 import { createSnapshot, addSnapshot } from './engine/snapshots.js'
 import { proposeLimits } from './engine/autoThresholds.js'
 import {
+  startFlush, flushRemaining, isFlushActive, effectiveFio2, FLUSH_DURATION_SECONDS,
+} from './engine/oxygenation.js'
+import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
 } from './engine/eventLog.js'
 
@@ -74,6 +77,7 @@ export default function App() {
   const [pendingSettings, setPendingSettings] = useState(null)
   const [confirm, setConfirm] = useState(null)
   const [autoset, setAutoset] = useState(null)
+  const [flush, setFlush] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   const t = makeTranslator(language)
@@ -87,15 +91,24 @@ export default function App() {
   // unreachable rather than merely hidden.
   const availableModes = licensedModes(licence, MODES)
 
+  // The flush overrides delivered FiO2 without touching the set value, so
+  // it cannot leave the setting changed behind it.
+  const deliveredFio2 = effectiveFio2(settings, flush, now)
+  const flushActive = isFlushActive(flush, now)
+  const flushLeft = flushRemaining(flush, now)
+
   const {
-    waveform, loop, numerics, measurements, alarms, reset,
+    waveform, loop, numerics: rawNumerics, measurements, alarms, spo2, reset,
     maneuver, startManeuver, clearManeuver,
   } = useVentilatorEngine({
     settings,
     patient,
     ventilating,
     technical: { preUseCheckDue: !testStatus.partial },
+    deliveredFio2,
   })
+
+  const numerics = { ...rawNumerics, spo2, fio2: deliveredFio2 }
 
   const log = useCallback((entry) => {
     setEvents((prev) => appendEvent(prev, createEvent(entry)))
@@ -137,12 +150,14 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  // Ticks the audio-pause countdown while it is active.
+  // Ticks while either the audio pause or the oxygen flush is counting down.
   useEffect(() => {
-    if (audioPausedUntil <= Date.now()) return undefined
-    const t = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(t)
-  }, [audioPausedUntil])
+    const pausing = audioPausedUntil > Date.now()
+    const flushing = isFlushActive(flush, Date.now())
+    if (!pausing && !flushing) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(timer)
+  }, [audioPausedUntil, flush])
 
   const audioPaused = audioPausedUntil > now
   const pauseRemaining = Math.max(0, Math.ceil((audioPausedUntil - now) / 1000))
@@ -419,6 +434,38 @@ export default function App() {
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">
+            <div className="oxygen-row">
+              <button
+                type="button"
+                className={flushActive ? 'btn btn-flush active' : 'btn btn-flush'}
+                onClick={() => {
+                  if (flushActive) return
+                  setFlush(startFlush())
+                  log({
+                    category: EVENT_CATEGORY.SETTING,
+                    message: `100 % oxygen started for ${FLUSH_DURATION_SECONDS}s`,
+                    detail: `Set FiO₂ remains ${settings.fio2} %`,
+                  })
+                }}
+              >
+                {flushActive ? `100 % O₂ · ${flushLeft}s` : '100 % O₂ · 2 min'}
+              </button>
+              {flushActive && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-tiny"
+                  onClick={() => {
+                    setFlush(null)
+                    log({ category: EVENT_CATEGORY.SETTING, message: '100 % oxygen ended early' })
+                  }}
+                >End now</button>
+              )}
+              {flushActive && (
+                <span className="oxygen-note">
+                  Delivering {deliveredFio2} % — set value unchanged at {settings.fio2} %
+                </span>
+              )}
+            </div>
             <AlarmBanner
               alarms={alarms}
               audioPaused={audioPaused}

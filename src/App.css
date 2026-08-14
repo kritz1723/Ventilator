@@ -1357,3 +1357,17 @@
 .autoset-unavailable { margin: 10px 0 0; font-size: 11px; color: var(--warning); }
 .autoset-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .autoset-actions .btn { flex: none; min-width: 96px; }
+
+/* ---------- Oxygen flush ---------- */
+.oxygen-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-flush {
+  flex: none; min-width: 150px;
+  background: linear-gradient(180deg, rgba(76,196,245,0.22), rgba(76,196,245,0.08));
+  border-color: rgba(76,196,245,0.45); color: var(--accent);
+}
+.btn-flush.active {
+  background: linear-gradient(180deg, rgba(95,224,143,0.28), rgba(95,224,143,0.1));
+  border-color: rgba(95,224,143,0.55); color: var(--ok);
+  animation: pulse 2s ease-in-out infinite;
+}
+.oxygen-note { font-size: 11.5px; color: var(--ok); }
