@@ -679,6 +679,15 @@ export const TEST_CASES = [
     steps: ['Change the simulated lung to COPD and observe the waveforms.', 'Change the spontaneous effort and observe triggering.', 'Attempt to change the patient category.'],
     expected: 'Lung and effort change immediately without an edit or save step, the waveforms respond, and the patient category remains locked with its reason stated.',
   },
+  {
+    id: 'TC-082',
+    title: 'Pre-oxygenation is reachable from every monitoring page',
+    type: T.INTEGRATION,
+    requirements: ['REQ-094'],
+    precondition: 'Ventilating with FiO2 set to 40 %.',
+    steps: ['Visit each page of the monitoring display and confirm the oxygen control is present.', 'Start pre-oxygenation and read the delivered FiO2 and the remaining time.', 'Confirm the set FiO2 is unchanged.'],
+    expected: 'The control is present on every page, delivered FiO2 rises to 100 %, the remaining time counts down in place, and the set value is untouched.',
+  },
 ]
 
 export function testCaseById(id) {

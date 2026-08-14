@@ -302,6 +302,18 @@ export default function App() {
   }, [ventilating, settings.mode])
 
 
+  // Pre-oxygenation is offered in more than one place, so the action itself
+  // lives here rather than in whichever control happened to be pressed.
+  const startOxygenFlush = useCallback(() => {
+    if (isFlushActive(flush, Date.now())) return
+    setFlush(startFlush())
+    log({
+      category: EVENT_CATEGORY.SETTING,
+      message: `100 % oxygen started for ${FLUSH_DURATION_SECONDS}s`,
+      detail: `Set FiO₂ remains ${settings.fio2} %`,
+    })
+  }, [flush, settings.fio2, log])
+
   // Simulation inputs apply immediately, ventilating or not: they are not
   // delivered to anyone, so there is nothing to acknowledge, and staging them
   // behind Save would hide the response that makes the change worth making.
@@ -596,6 +608,9 @@ export default function App() {
             onOpenInfo={() => setInfoOpen(true)}
             logCount={events.length}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
+            onOxygenFlush={startOxygenFlush}
+            flushActive={flushActive}
+            flushRemaining={flushLeft}
             t={t}
           />
 
@@ -668,15 +683,7 @@ export default function App() {
                     <button
                       type="button"
                       className={flushActive ? 'btn btn-flush active' : 'btn btn-flush'}
-                      onClick={() => {
-                        if (flushActive) return
-                        setFlush(startFlush())
-                        log({
-                          category: EVENT_CATEGORY.SETTING,
-                          message: `100 % oxygen started for ${FLUSH_DURATION_SECONDS}s`,
-                          detail: `Set FiO₂ remains ${settings.fio2} %`,
-                        })
-                      }}
+                      onClick={startOxygenFlush}
                     >
                       {flushActive ? `100 % O₂ · ${flushLeft}s` : '100 % O₂ · 2 min'}
                     </button>
@@ -769,6 +776,9 @@ export default function App() {
                     setupLocked={setupLocked}
                     holdState={holdState}
                     onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
+            onOxygenFlush={startOxygenFlush}
+            flushActive={flushActive}
+            flushRemaining={flushLeft}
                   />
                 </div>
               )}
