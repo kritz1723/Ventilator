@@ -30,7 +30,7 @@ function niceTicks(min, max) {
   return [...new Set(ticks)].sort((a, b) => a - b)
 }
 
-function draw(canvas, data, channel, scale, sweepSeconds, cursorIndex) {
+function draw(canvas, data, channel, scale, sweepSeconds, cursors) {
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
   const w = canvas.clientWidth
@@ -110,7 +110,8 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursorIndex) {
   ctx.stroke()
   ctx.shadowBlur = 0
 
-  if (cursorIndex == null) {
+  const active = (cursors ?? []).filter((c) => c != null)
+  if (!active.length) {
     const lastX = xFor(data.length - 1)
     const lastY = yFor(data[data.length - 1][channel.key])
     ctx.fillStyle = colors.trace
@@ -120,30 +121,45 @@ function draw(canvas, data, channel, scale, sweepSeconds, cursorIndex) {
     return
   }
 
-  const i = Math.min(Math.max(cursorIndex, 0), data.length - 1)
-  const cx = xFor(i)
-  const cy = yFor(data[i][channel.key])
-  ctx.strokeStyle = colors.axis
-  ctx.lineWidth = 1
-  ctx.setLineDash([4, 3])
-  ctx.beginPath()
-  ctx.moveTo(cx, 0)
-  ctx.lineTo(cx, h)
-  ctx.stroke()
-  ctx.setLineDash([])
-  ctx.fillStyle = colors.trace
-  ctx.beginPath()
-  ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = colors.zero
-  ctx.lineWidth = 1.4
-  ctx.beginPath()
-  ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
-  ctx.stroke()
+  const clamp = (i) => Math.min(Math.max(i, 0), data.length - 1)
+
+  // Shade the interval when both cursors are placed, so the span being
+  // measured is visible rather than having to be inferred from two lines.
+  if (active.length === 2) {
+    const [a, b] = active.map(clamp).sort((x, y) => x - y)
+    ctx.fillStyle = withAlpha(colors.trace, 0.09)
+    ctx.fillRect(xFor(a), 0, xFor(b) - xFor(a), h)
+  }
+
+  active.forEach((raw, n) => {
+    const i = clamp(raw)
+    const cx = xFor(i)
+    const cy = yFor(data[i][channel.key])
+    ctx.strokeStyle = colors.axis
+    ctx.lineWidth = 1
+    // The reference cursor is dashed and the measuring cursor solid, so the
+    // two are distinguishable without relying on colour.
+    ctx.setLineDash(n === 0 ? [] : [4, 3])
+    ctx.beginPath()
+    ctx.moveTo(cx, 0)
+    ctx.lineTo(cx, h)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    ctx.fillStyle = colors.trace
+    ctx.beginPath()
+    ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = colors.zero
+    ctx.lineWidth = 1.4
+    ctx.beginPath()
+    ctx.arc(cx, cy, 3.6, 0, Math.PI * 2)
+    ctx.stroke()
+  })
 }
 
 function TraceRow({
-  data, channel, scaleIndex, sweepSeconds, cursorIndex, onScrub,
+  data, channel, scaleIndex, sweepSeconds, cursors, onScrub,
   editing, onScaleChange, onRemove, onMoveUp, onMoveDown, compact, canRemove,
 }) {
   const canvasRef = useRef(null)
@@ -152,12 +168,12 @@ function TraceRow({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return undefined
-    const render = () => draw(canvas, data, channel, scale, sweepSeconds, cursorIndex)
+    const render = () => draw(canvas, data, channel, scale, sweepSeconds, cursors)
     render()
     const ro = new ResizeObserver(render)
     ro.observe(canvas)
     return () => ro.disconnect()
-  }, [data, channel, scale, sweepSeconds, cursorIndex])
+  }, [data, channel, scale, sweepSeconds, cursors])
 
   const handlePointer = (e) => {
     if (!onScrub) return
@@ -167,9 +183,14 @@ function TraceRow({
     onScrub(Math.round(Math.min(Math.max(frac, 0), 1) * (data.length - 1)))
   }
 
-  const value = cursorIndex != null && data.length
-    ? data[Math.min(Math.max(cursorIndex, 0), data.length - 1)][channel.key]
-    : null
+  const readAt = (i) => (
+    i == null || !data.length
+      ? null
+      : data[Math.min(Math.max(i, 0), data.length - 1)][channel.key]
+  )
+  const primary = readAt(cursors?.[0])
+  const secondary = readAt(cursors?.[1])
+  const delta = primary != null && secondary != null ? secondary - primary : null
 
   return (
     <div className={compact ? 'trace-row trace-row-compact' : 'trace-row'}>
@@ -177,9 +198,17 @@ function TraceRow({
         <span className="trace-dot" style={{ background: `var(${channel.token})` }} />
         <span className="trace-name">{channel.label}</span>
         <span className="trace-unit">{channel.unit}</span>
-        {value != null && (
+        {primary != null && (
           <span className="trace-cursor-value tnum" style={{ color: `var(${channel.token})` }}>
-            {value.toFixed(1)}
+            {primary.toFixed(1)}
+          </span>
+        )}
+        {secondary != null && (
+          <span className="trace-cursor-second tnum">{secondary.toFixed(1)}</span>
+        )}
+        {delta != null && (
+          <span className="trace-cursor-delta tnum">
+            Δ {delta > 0 ? '+' : ''}{delta.toFixed(1)}
           </span>
         )}
         {editing && (
@@ -217,7 +246,7 @@ function TraceRow({
 }
 
 export default function WaveformDisplay({
-  waveform, layout, onLayoutChange, frozen, onToggleFreeze, cursorIndex, onCursorChange,
+  waveform, layout, onLayoutChange, frozen, onToggleFreeze, cursors, onCursorsChange,
   t = (k) => k,
 }) {
   const [editing, setEditing] = useState(false)
@@ -228,9 +257,25 @@ export default function WaveformDisplay({
   const wanted = Math.round(sweepSeconds * SAMPLE_HZ)
   const data = waveform.length > wanted ? waveform.slice(-wanted) : waveform
 
-  const cursorTime = cursorIndex != null && data.length > 1
-    ? ((cursorIndex / (data.length - 1)) * sweepSeconds - sweepSeconds).toFixed(2)
-    : null
+  // Cursor position expressed as time before the newest sample.
+  const timeAt = (i) => (
+    i == null || data.length < 2
+      ? null
+      : (i / (data.length - 1)) * sweepSeconds - sweepSeconds
+  )
+  const t0 = timeAt(cursors?.[0])
+  const t1 = timeAt(cursors?.[1])
+  const dt = t0 != null && t1 != null ? t1 - t0 : null
+
+  // First click sets the reference, second sets the measuring cursor, third
+  // starts over — so two-point measurement needs no mode switch.
+  const placeCursor = (index) => {
+    if (!onCursorsChange) return
+    const [a, b] = cursors ?? []
+    if (a == null) onCursorsChange([index, null])
+    else if (b == null) onCursorsChange([a, index])
+    else onCursorsChange([index, null])
+  }
 
   const setTraces = (next) => onLayoutChange({ ...layout, traces: next })
 
@@ -244,7 +289,22 @@ export default function WaveformDisplay({
       <div className="waveform-header">
         <span className="panel-title">{t('panel.waveforms')}</span>
         <div className="waveform-tools">
-          {frozen && cursorTime != null && <span className="cursor-time tnum">{cursorTime}s</span>}
+          {frozen && t0 != null && (
+            <span className="cursor-time tnum">{t0.toFixed(2)}s</span>
+          )}
+          {frozen && t1 != null && (
+            <span className="cursor-time cursor-time-second tnum">{t1.toFixed(2)}s</span>
+          )}
+          {frozen && dt != null && (
+            <span className="cursor-delta tnum">Δt {dt > 0 ? '+' : ''}{dt.toFixed(2)}s</span>
+          )}
+          {frozen && cursors?.[0] != null && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-tiny"
+              onClick={() => onCursorsChange([null, null])}
+            >Clear cursors</button>
+          )}
           <label className="sweep-select">
             <span>{t('field.sweep')}</span>
             <select
@@ -274,7 +334,15 @@ export default function WaveformDisplay({
         </div>
       </div>
 
-      {frozen && <p className="freeze-hint">Frozen — click or drag across a trace to inspect a point.</p>}
+      {frozen && (
+        <p className="freeze-hint">
+          {cursors?.[0] == null
+            ? 'Frozen — click a trace to place the reference cursor.'
+            : cursors?.[1] == null
+              ? 'Click again to place a second cursor and read the difference between them.'
+              : 'Two cursors placed. Click again to start a new measurement.'}
+        </p>
+      )}
 
       {editing && onLayoutChange && (
         <div className="layout-editor">
@@ -306,8 +374,8 @@ export default function WaveformDisplay({
             channel={channel}
             scaleIndex={t.scale}
             sweepSeconds={sweepSeconds}
-            cursorIndex={frozen ? cursorIndex : null}
-            onScrub={frozen ? onCursorChange : null}
+            cursors={frozen ? cursors : null}
+            onScrub={frozen ? placeCursor : null}
             editing={editing}
             compact={traces.length >= 5}
             canRemove={traces.length > MIN_TRACES}

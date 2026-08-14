@@ -58,7 +58,7 @@ export default function App() {
   const [audioPausedUntil, setAudioPausedUntil] = useState(0)
   const [frozen, setFrozen] = useState(false)
   const [frozenWaveform, setFrozenWaveform] = useState(null)
-  const [cursorIndex, setCursorIndex] = useState(null)
+  const [cursors, setCursors] = useState([null, null])
   const [snapshots, setSnapshots] = useState([])
   const [events, setEvents] = useState([])
   const [logOpen, setLogOpen] = useState(false)
@@ -150,11 +150,12 @@ export default function App() {
     setFrozen((wasFrozen) => {
       if (wasFrozen) {
         setFrozenWaveform(null)
-        setCursorIndex(null)
+        setCursors([null, null])
         return false
       }
       setFrozenWaveform(waveform)
-      setCursorIndex(Math.floor(waveform.length / 2))
+      // Start with no cursor placed; the operator chooses both points.
+      setCursors([null, null])
       return true
     })
   }, [waveform])
@@ -225,7 +226,7 @@ export default function App() {
     reset()
     setFrozen(false)
     setFrozenWaveform(null)
-    setCursorIndex(null)
+    setCursors([null, null])
     setScreen(SCREEN.VENTILATING)
     log({
       category: EVENT_CATEGORY.STATE,
@@ -418,8 +419,8 @@ export default function App() {
               onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
               frozen={frozen}
               onToggleFreeze={toggleFreeze}
-              cursorIndex={cursorIndex}
-              onCursorChange={setCursorIndex}
+              cursors={cursors}
+              onCursorsChange={setCursors}
             />
             <ManeuverResult maneuver={maneuver} onClose={clearManeuver} />
             <div className="monitor-lower">
