@@ -17,6 +17,7 @@ import ConfirmDialog from './components/ConfirmDialog.jsx'
 import AdminScreen from './components/AdminScreen.jsx'
 import PendingChangesBar from './components/PendingChangesBar.jsx'
 import AutosetProposal from './components/AutosetProposal.jsx'
+import LungIllustration from './components/LungIllustration.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -98,7 +99,7 @@ export default function App() {
   const flushLeft = flushRemaining(flush, now)
 
   const {
-    waveform, loop, numerics: rawNumerics, measurements, alarms, spo2, reset,
+    waveform, loop, numerics: rawNumerics, measurements, alarms, spo2, live, reset,
     maneuver, startManeuver, clearManeuver,
   } = useVentilatorEngine({
     settings,
@@ -508,6 +509,20 @@ export default function App() {
                 onSelectedChange={setSelectedMeasurements}
                 units={units}
               />
+              <div className="lung-column panel">
+                <span className="panel-title">Simulated lung</span>
+                <LungIllustration
+                  volume={live.volume}
+                  tidalVolume={settings.tidalVolume}
+                  spo2={spo2}
+                  compliance={patient.compliance}
+                  phase={live.phase}
+                />
+                <div className="lung-stats">
+                  <span>{patient.label}</span>
+                  <span>C {patient.compliance} · R {patient.resistance}</span>
+                </div>
+              </div>
               {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
             </div>
             {isEnabled(licence, 'captures') && (

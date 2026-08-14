@@ -58,6 +58,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
   const [measurements, setMeasurements] = useState(emptyMeasurements)
   const [alarms, setAlarms] = useState([])
   const [spo2, setSpo2] = useState(null)
+  const [live, setLive] = useState({ volume: 0, phase: null })
   const [maneuver, setManeuver] = useState(null)
 
   const maneuverRef = useRef(null)
@@ -266,6 +267,10 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
     const render = () => {
       setWaveform([...bufferRef.current])
       setSpo2(spo2Ref.current)
+      setLive({
+        volume: modeStateRef.current.volume ?? 0,
+        phase: modeStateRef.current.phase ?? null,
+      })
       frameHandle = requestAnimationFrame(render)
     }
 
@@ -320,6 +325,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
     setAlarms([])
     spo2Ref.current = null
     setSpo2(null)
+    setLive({ volume: 0, phase: null })
     setManeuver(null)
     maneuverRef.current = null
     pendingManeuverRef.current = null
@@ -327,7 +333,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
   }, [resetBreathTracking])
 
   return {
-    waveform, loop, numerics, measurements, alarms, spo2, reset,
+    waveform, loop, numerics, measurements, alarms, spo2, live, reset,
     maneuver, startManeuver, clearManeuver,
   }
 }
