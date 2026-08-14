@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { REQUIREMENTS, requirementById } from '../docs/requirements.js'
 import { RISKS, riskById, rpn } from '../docs/risks.js'
 import { USER_PROFILES } from '../docs/userProfiles.js'
+import { TEST_CASES, testCaseById, automatedCount } from '../docs/testCases.js'
 
 const TABS = [
   { id: 'requirements', label: 'Requirements' },
   { id: 'risks', label: 'Risk / DFMEA' },
+  { id: 'tests', label: 'Test cases' },
   { id: 'trace', label: 'Traceability' },
   { id: 'profiles', label: 'User profiles' },
 ]
@@ -133,6 +135,69 @@ function RisksTab() {
   )
 }
 
+function TestsTab() {
+  const [query, setQuery] = useState('')
+  const [onlyManual, setOnlyManual] = useState(false)
+
+  const shown = TEST_CASES.filter((t) => {
+    if (onlyManual && t.automatedBy) return false
+    if (!query.trim()) return true
+    const q = query.toLowerCase()
+    return `${t.id} ${t.title} ${t.expected}`.toLowerCase().includes(q)
+  })
+
+  return (
+    <>
+      <div className="doc-toolbar">
+        <input
+          className="log-search"
+          type="search"
+          placeholder="Search test cases…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button
+          type="button"
+          className={onlyManual ? 'facet active' : 'facet'}
+          onClick={() => setOnlyManual((v) => !v)}
+        >Manual only</button>
+        <span className="doc-count">
+          {automatedCount()} of {TEST_CASES.length} automated
+        </span>
+      </div>
+
+      <div className="doc-list">
+        {shown.map((t) => (
+          <article key={t.id} className="doc-card">
+            <header className="doc-card-head">
+              <span className="doc-id">{t.id}</span>
+              <span className="doc-title">{t.title}</span>
+              <span className={t.automatedBy ? 'doc-tag tag-auto' : 'doc-tag'}>
+                {t.automatedBy ? 'Automated' : 'Manual'}
+              </span>
+            </header>
+            <div className="risk-grid">
+              <div><span className="risk-label">Type</span>{t.type}</div>
+              <div><span className="risk-label">Precondition</span>{t.precondition}</div>
+            </div>
+            <div className="risk-controls">
+              <span className="risk-label">Steps</span>
+              <ol className="tc-steps">{t.steps.map((x) => <li key={x}>{x}</li>)}</ol>
+            </div>
+            <p className="doc-text tc-expected"><b>Expected.</b> {t.expected}</p>
+            <div className="doc-meta">
+              {t.requirements.map((x) => (
+                <span key={x} className="doc-chip chip-req" title={requirementById(x)?.title}>{x}</span>
+              ))}
+              {t.automatedBy && <span className="doc-chip chip-auto">{t.automatedBy}</span>}
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function TraceabilityTab() {
   // Resolved in both directions: each requirement to the risks it controls,
   // and each risk back to the requirements that mitigate it.
@@ -152,7 +217,15 @@ function TraceabilityTab() {
                   <span key={x} className="doc-chip chip-risk" title={riskById(x)?.failureMode}>{x}</span>
                 ))}
               </td>
-              <td>{r.tests.map((t) => <span key={t} className="doc-chip">{t}</span>)}</td>
+              <td>
+                {r.tests.map((t) => (
+                  <span
+                    key={t}
+                    className={testCaseById(t)?.automatedBy ? 'doc-chip chip-auto' : 'doc-chip'}
+                    title={testCaseById(t)?.title}
+                  >{t}</span>
+                ))}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -223,6 +296,7 @@ export default function AdminScreen({ onExit }) {
       <div className="admin-body">
         {tab === 'requirements' && <RequirementsTab />}
         {tab === 'risks' && <RisksTab />}
+        {tab === 'tests' && <TestsTab />}
         {tab === 'trace' && <TraceabilityTab />}
         {tab === 'profiles' && <ProfilesTab />}
       </div>

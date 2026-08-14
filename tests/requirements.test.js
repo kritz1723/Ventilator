@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { REQUIREMENTS, requirementById } from '../src/docs/requirements.js'
 import { RISKS, riskById, rpn } from '../src/docs/risks.js'
 import { USER_PROFILES } from '../src/docs/userProfiles.js'
+import { TEST_CASES, testCaseById } from '../src/docs/testCases.js'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // These assertions enforce the INCOSE characteristics that can be checked
 // mechanically. The rest (necessary, correct, feasible) need human review.
@@ -117,6 +120,52 @@ describe('risk scoring', () => {
   it('states a residual risk position for every risk', () => {
     for (const r of RISKS) {
       expect(r.residual, r.id).toBeTruthy()
+    }
+  })
+})
+
+describe('test case register', () => {
+  it('gives every test case a unique identifier', () => {
+    const ids = TEST_CASES.map((t) => t.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('resolves every test referenced by a requirement', () => {
+    for (const r of REQUIREMENTS) {
+      for (const id of r.tests) {
+        expect(testCaseById(id), `${r.id} references unknown test ${id}`).not.toBeNull()
+      }
+    }
+  })
+
+  it('resolves every requirement referenced by a test case', () => {
+    for (const t of TEST_CASES) {
+      for (const id of t.requirements) {
+        expect(requirementById(id), `${t.id} references unknown requirement ${id}`).not.toBeNull()
+      }
+    }
+  })
+
+  it('leaves no test case orphaned from the requirements', () => {
+    const referenced = new Set(REQUIREMENTS.flatMap((r) => r.tests))
+    for (const t of TEST_CASES) {
+      expect(referenced.has(t.id), `${t.id} is not referenced by any requirement`).toBe(true)
+    }
+  })
+
+  it('states a precondition, steps and an expected result for every case', () => {
+    for (const t of TEST_CASES) {
+      expect(t.precondition, t.id).toBeTruthy()
+      expect(t.steps?.length, t.id).toBeGreaterThan(0)
+      expect(t.expected, t.id).toBeTruthy()
+      expect(t.type, t.id).toBeTruthy()
+    }
+  })
+
+  it('names an existing spec file for every automated case', () => {
+    for (const t of TEST_CASES) {
+      if (!t.automatedBy) continue
+      expect(existsSync(resolve(t.automatedBy)), `${t.id} names missing spec ${t.automatedBy}`).toBe(true)
     }
   })
 })
