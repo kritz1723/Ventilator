@@ -3,8 +3,10 @@ import { REQUIREMENTS, requirementById } from '../docs/requirements.js'
 import { RISKS, riskById, rpn } from '../docs/risks.js'
 import { USER_PROFILES } from '../docs/userProfiles.js'
 import { TEST_CASES, testCaseById, automatedCount } from '../docs/testCases.js'
+import LicensingTab from './LicensingTab.jsx'
 
 const TABS = [
+  { id: 'licensing', label: 'Features' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'risks', label: 'Risk / DFMEA' },
   { id: 'tests', label: 'Test cases' },
@@ -265,8 +267,8 @@ function ProfilesTab() {
   )
 }
 
-export default function AdminScreen({ onExit }) {
-  const [tab, setTab] = useState('requirements')
+export default function AdminScreen({ onExit, licence, onLicenceChange, canEdit, blockedReason }) {
+  const [tab, setTab] = useState('licensing')
 
   return (
     <div className="admin-screen">
@@ -294,6 +296,14 @@ export default function AdminScreen({ onExit }) {
       </nav>
 
       <div className="admin-body">
+        {tab === 'licensing' && (
+          <LicensingTab
+            licence={licence}
+            onLicenceChange={onLicenceChange}
+            canEdit={canEdit}
+            blockedReason={blockedReason}
+          />
+        )}
         {tab === 'requirements' && <RequirementsTab />}
         {tab === 'risks' && <RisksTab />}
         {tab === 'tests' && <TestsTab />}
