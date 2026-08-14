@@ -1,0 +1,1059 @@
+<title>ICU Ventilator Concept</title>
+<style>
+  :root {
+    --ground: #FBFCFD;
+    --surface: #FFFFFF;
+    --surface-2: #F4F7F9;
+    --ink: #10161C;
+    --ink-2: #46535F;
+    --ink-3: #6C7A87;
+    --line: #DCE3E9;
+    --line-2: #EDF1F4;
+    --accent: #0B6E8A;
+    --accent-soft: #E4F1F5;
+    --high: #C8322E;
+    --medium: #A96C00;
+    --low: #2C6E9B;
+    --high-soft: #FBEAE9;
+    --medium-soft: #FCF2DF;
+    --low-soft: #E8F1F8;
+
+    --font-display: "Helvetica Neue", Helvetica, "Segoe UI", system-ui, Arial, sans-serif;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0C1116;
+      --surface: #131A21;
+      --surface-2: #182129;
+      --ink: #E8EEF3;
+      --ink-2: #A2B0BC;
+      --ink-3: #72828F;
+      --line: #222E38;
+      --line-2: #1B242C;
+      --accent: #4CC4F5;
+      --accent-soft: #10333F;
+      --high: #FF6B6B;
+      --medium: #FFBE4D;
+      --low: #6FC0F0;
+      --high-soft: #2A1618;
+      --medium-soft: #2A2114;
+      --low-soft: #12242F;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0C1116;
+    --surface: #131A21;
+    --surface-2: #182129;
+    --ink: #E8EEF3;
+    --ink-2: #A2B0BC;
+    --ink-3: #72828F;
+    --line: #222E38;
+    --line-2: #1B242C;
+    --accent: #4CC4F5;
+    --accent-soft: #10333F;
+    --high: #FF6B6B;
+    --medium: #FFBE4D;
+    --low: #6FC0F0;
+    --high-soft: #2A1618;
+    --medium-soft: #2A2114;
+    --low-soft: #12242F;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One column system, shared by every band of the page. Three different
+     centred wrappers is how a masthead ends up on a different left edge from
+     the prose beneath it. */
+  .page, .band {
+    display: grid;
+    grid-template-columns:
+      [full-start] minmax(20px, 1fr)
+      [text-start] minmax(0, 68ch) [text-end]
+      minmax(0, 200px) [wide-end]
+      minmax(20px, 1fr) [full-end];
+    row-gap: 0;
+  }
+  /* Everything shares one left edge. Data blocks earn their extra room by
+     extending to the right, which reads as a deliberate measure rather than
+     as three wrappers that failed to line up. */
+  .page > *, .band > * { grid-column: text; }
+  .wide { grid-column: text-start / wide-end; }
+  .full { grid-column: full; }
+
+  /* ---------- Masthead ---------- */
+  header.masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    padding: 58px 0 40px;
+  }
+  .masthead-inner {
+    grid-column: text-start / wide-end;
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    gap: 30px 48px; justify-content: space-between;
+  }
+  .masthead-lead { flex: 1 1 30ch; min-width: 0; }
+  .masthead h1 {
+    font-family: var(--font-display);
+    font-size: clamp(34px, 5.4vw, 58px);
+    font-weight: 800;
+    letter-spacing: -0.032em;
+    line-height: 1.02;
+    margin: 12px 0 14px;
+    text-wrap: balance;
+  }
+  .masthead p.standfirst {
+    margin: 0; max-width: 46ch;
+    font-size: 18.5px; color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  .masthead-meta {
+    display: grid; gap: 10px;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--ink-3);
+  }
+  .masthead-meta div { display: flex; gap: 10px; }
+  .masthead-meta b {
+    color: var(--ink-2); font-weight: 600;
+    min-width: 74px; display: inline-block;
+  }
+  .masthead-meta a { color: var(--accent); text-decoration: none; }
+  .masthead-meta a:hover { text-decoration: underline; }
+
+  /* ---------- Notice ---------- */
+  .notice {
+    background: var(--high-soft);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 0;
+  }
+  .notice-inner {
+    grid-column: text-start / wide-end;
+    display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .notice-inner strong {
+    color: var(--high); font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  /* ---------- Sections ---------- */
+  section { padding: 4px 0 0; }
+  section:first-of-type { padding-top: 52px; }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: clamp(23px, 2.6vw, 30px);
+    font-weight: 750; letter-spacing: -0.021em; line-height: 1.16;
+    margin: 60px 0 6px; text-wrap: balance;
+  }
+  h2 + .kicker {
+    margin: 0 0 22px; color: var(--ink-3);
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.02em;
+  }
+  h3 {
+    font-family: var(--font-display);
+    font-size: 17px; font-weight: 700; letter-spacing: -0.008em;
+    margin: 34px 0 8px;
+  }
+  p { margin: 0 0 18px; }
+  p.lede { font-size: 19px; color: var(--ink-2); }
+  a { color: var(--accent); }
+
+  ul.plain { margin: 0 0 20px; padding-left: 20px; }
+  ul.plain li { margin-bottom: 9px; }
+  ul.plain li::marker { color: var(--ink-3); }
+
+  code, .mono { font-family: var(--font-mono); font-size: 0.87em; }
+  code {
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    padding: 1px 5px; border-radius: 3px; color: var(--ink-2);
+  }
+
+  /* ---------- Rules ---------- */
+  .rule {
+    height: 1px; background: var(--line); border: 0;
+    margin: 58px 0 0; grid-column: text-start / wide-end;
+  }
+
+  /* ---------- Stat band ---------- */
+  /* Three across, and every band carries six figures, so the grid always
+     fills. An auto-fit track count leaves empty cells showing the divider
+     colour, which reads as a missing value rather than as a layout. */
+  .stats {
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--line); border: 1px solid var(--line);
+    margin: 26px 0 8px; border-radius: 4px; overflow: hidden;
+  }
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .stat { background: var(--surface); padding: 16px 16px 14px; }
+  .stat b {
+    display: block; font-family: var(--font-mono);
+    font-size: 27px; font-weight: 600; letter-spacing: -0.02em;
+    color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .stat span {
+    display: block; margin-top: 5px;
+    font-family: var(--font-mono); font-size: 10.5px;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3);
+  }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 22px 0 10px; }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  caption {
+    caption-side: top; text-align: left;
+    font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-3); padding-bottom: 9px;
+  }
+  th {
+    text-align: left; font-weight: 600; color: var(--ink-2);
+    font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+    padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3);
+    white-space: nowrap; vertical-align: bottom;
+  }
+  td {
+    padding: 9px 14px 9px 0; border-bottom: 1px solid var(--line);
+    color: var(--ink-2); vertical-align: top;
+  }
+  td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; padding-right: 22px; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+    background: var(--surface-2); color: var(--ink-3); border: 1px solid var(--line);
+  }
+  .tag.base { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .tag.mand { background: var(--high-soft); color: var(--high); border-color: transparent; }
+
+  /* ---------- Alarm priority cards ---------- */
+  .priorities { display: grid; gap: 14px; margin: 24px 0 10px; }
+  .priority {
+    display: grid; gap: 4px 20px;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    align-items: center;
+    padding: 16px 18px; border-radius: 5px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--tone);
+  }
+  .priority.high { --tone: var(--high); }
+  .priority.medium { --tone: var(--medium); }
+  .priority.low { --tone: var(--low); }
+  .priority-name {
+    font-family: var(--font-display); font-weight: 700; font-size: 15px;
+    color: var(--tone); letter-spacing: -0.005em;
+  }
+  .priority-spec {
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3);
+    font-variant-numeric: tabular-nums; margin-top: 2px;
+  }
+  .priority svg { width: 100%; height: 40px; display: block; }
+  .priority-eg {
+    grid-column: 1 / -1; font-family: var(--font-mono);
+    font-size: 11.5px; color: var(--ink-3); margin-top: 6px;
+  }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 5px; padding: 20px 22px; margin: 24px 0 10px;
+  }
+  .callout .eyebrow { margin-bottom: 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .equation {
+    font-family: var(--font-mono); font-size: 15px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line-2);
+    padding: 14px 16px; border-radius: 4px; margin: 4px 0 16px;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .equation .op { color: var(--accent); }
+
+  /* ---------- Two-column facts ---------- */
+  .facts {
+    display: grid; gap: 1px; margin: 22px 0 10px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    background: var(--line); border: 1px solid var(--line); border-radius: 4px;
+    overflow: hidden;
+  }
+  .fact { background: var(--surface); padding: 15px 17px; }
+  .fact dt {
+    font-family: var(--font-mono); font-size: 10.5px;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 6px;
+  }
+  .fact dd {
+    margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.5;
+  }
+  .fact dd b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Exclusions ---------- */
+  .excluded {
+    border-left: 3px solid var(--line); padding-left: 20px;
+    margin: 22px 0 10px;
+  }
+  .excluded p { margin-bottom: 12px; }
+  .excluded p:last-child { margin-bottom: 0; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    margin-top: 76px;
+    border-top: 1px solid var(--line); background: var(--surface);
+    padding: 34px 0 46px;
+  }
+  .footer-inner {
+    grid-column: text-start / wide-end;
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7;
+    color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 12px 40px; justify-content: space-between;
+  }
+  .footer-inner a { color: var(--accent); text-decoration: none; }
+  .footer-inner a:hover { text-decoration: underline; }
+
+  :where(a, button, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px;
+  }
+
+  @media (max-width: 700px) {
+    body { font-size: 16px; }
+    .priority { grid-template-columns: 1fr; }
+    section:first-of-type { padding-top: 34px; }
+    header.masthead { padding: 34px 20px 28px; }
+  }
+</style>
+<header class="masthead band">
+  <div class="masthead-inner">
+    <div class="masthead-lead">
+      <p class="eyebrow">Concept device definition</p>
+      <h1>ICU Ventilator</h1>
+      <p class="standfirst">
+        A critical care ventilator defined from the operator inwards: seven modes
+        across adult, paediatric and neonatal patients, a priority-coded alarm
+        system, and a display the clinician arranges. Specified in full, realised
+        as an interactive simulation, never built.
+      </p>
+    </div>
+    <div class="masthead-meta">
+      <div><b>Class</b><span>Critical care ventilator</span></div>
+      <div><b>Patients</b><span>Adult &middot; paediatric &middot; neonatal</span></div>
+      <div><b>Editions</b><span>Base &middot; Advanced &middot; Premium</span></div>
+      <div><b>Maturity</b><span>Concept &mdash; no hardware exists</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="notice band">
+  <div class="notice-inner">
+    <strong>Concept only</strong>
+    <span>
+      This describes a hypothetical device. No such ventilator has been manufactured,
+      verified, validated or certified, and none of this is a claim about a product
+      that can be bought or used. Every clinical value is illustrative. The standards
+      named below are the conventions the concept was written against; no conformity
+      assessment has been performed. Nothing here is suitable for clinical use or for
+      informing patient care.
+    </span>
+  </div>
+</div>
+
+<main class="page">
+
+  <section>
+    <p class="lede">
+      This is a device definition that was taken seriously enough to be run. Rather
+      than a slide deck describing a ventilator, the concept was specified as
+      requirements, analysed for hazards, and then executed &mdash; so that every
+      claim about how it behaves could be checked by operating it.
+    </p>
+    <p>
+      What follows is the product: what the device would deliver, what it would
+      measure, how it would alarm, how a clinician would work it, and where the
+      definition deliberately stops. Where a number appears, it is a number the
+      concept actually specifies, not an aspiration.
+    </p>
+
+    <div class="stats wide">
+      <div class="stat"><b>7</b><span>Ventilation modes</span></div>
+      <div class="stat"><b>3</b><span>Patient categories</span></div>
+      <div class="stat"><b>10</b><span>Alarm conditions</span></div>
+      <div class="stat"><b>19</b><span>Monitored values</span></div>
+      <div class="stat"><b>4</b><span>Languages</span></div>
+      <div class="stat"><b>132</b><span>Requirements</span></div>
+    </div>
+
+    <h3>Intended use, as the concept defines it</h3>
+    <p>
+      Continuous or intermittent ventilatory support for patients requiring
+      mechanical ventilation, in a critical care environment, operated by trained
+      clinical staff. The concept spans invasive ventilation of adult, paediatric
+      and neonatal patients, with the permitted range of every setting bounded by
+      the patient category selected at setup.
+    </p>
+    <p>
+      It is a definition, not a device. It has no hardware, no pneumatics, no
+      circuit and no regulatory status &mdash; see <em>where the concept stops</em>
+      below, which is as much a part of the product as what it contains.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Ventilation</h2>
+    <p class="kicker">Seven modes &middot; mandatory core, licensable extensions</p>
+
+    <p>
+      Modes are specified by what they guarantee to the patient, because that is the
+      only description that survives contact with a lung that does not cooperate. A
+      volume mode guarantees the volume and lets pressure follow; a pressure mode
+      guarantees the pressure and lets volume follow. The concept says which, and to
+      what tolerance.
+    </p>
+
+    <div class="table-wrap wide">
+      <table>
+        <caption>Mode catalogue</caption>
+        <thead>
+          <tr><th>Mode</th><th>Name</th><th>What it guarantees</th><th>Edition</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>VC-CMV</td><td>Volume control</td>
+            <td>Set tidal volume within &plusmn;5&nbsp;%; pressure is the consequence</td>
+            <td><span class="tag mand">Core</span></td>
+          </tr>
+          <tr>
+            <td>PC-CMV</td><td>Pressure control</td>
+            <td>Set inspiratory pressure held for the set time; volume is the consequence</td>
+            <td><span class="tag mand">Core</span></td>
+          </tr>
+          <tr>
+            <td>PRVC</td><td>Pressure regulated volume control</td>
+            <td>Volume target approached in steps of &le;&nbsp;3&nbsp;cmH&#8322;O, driving pressure ceiling 35&nbsp;cmH&#8322;O</td>
+            <td><span class="tag base">Advanced</span></td>
+          </tr>
+          <tr>
+            <td>VC-SIMV</td><td>Synchronised intermittent mandatory ventilation</td>
+            <td>Mandatory breaths synchronised to effort within 0.5&nbsp;s of becoming due</td>
+            <td><span class="tag base">Advanced</span></td>
+          </tr>
+          <tr>
+            <td>PSV / CPAP</td><td>Pressure support; CPAP at zero support</td>
+            <td>Flow-cycled at a set percentage of that breath&rsquo;s peak inspiratory flow</td>
+            <td><span class="tag base">Advanced</span></td>
+          </tr>
+          <tr>
+            <td>BiLevel</td><td>Bi-level pressure with spontaneous breathing</td>
+            <td>Two pressure levels, spontaneous breathing permitted at both</td>
+            <td><span class="tag">Premium</span></td>
+          </tr>
+          <tr>
+            <td>APRV</td><td>Airway pressure release ventilation</td>
+            <td>Long high-pressure phase with brief timed releases</td>
+            <td><span class="tag">Premium</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Breath delivery</h3>
+    <dl class="facts wide">
+      <div class="fact">
+        <dt>Triggering</dt>
+        <dd><b>Flow trigger</b>, operator-set sensitivity. One patient effort
+        initiates exactly one supported breath &mdash; a sustained effort does not
+        stack them</dd>
+      </div>
+      <div class="fact">
+        <dt>Apnea backup</dt>
+        <dd><b>12&nbsp;s.</b> Every patient-triggered mode delivers a mandatory breath
+        if no effort is detected. A mode that ventilates only on effort must not stop
+        when effort ceases</dd>
+      </div>
+      <div class="fact">
+        <dt>Inspiratory flow patterns</dt>
+        <dd><b>Square, decelerating, accelerating, sine.</b> Changing pattern alters
+        distribution and peak pressure, never the delivered dose &mdash; the same
+        tidal volume within &plusmn;2&nbsp;%</dd>
+      </div>
+      <div class="fact">
+        <dt>Rise time and pause</dt>
+        <dd><b>Operator-set</b> inspiratory rise and end-inspiratory pause, with an
+        I:E ratio derived and displayed rather than entered twice</dd>
+      </div>
+    </dl>
+
+    <div class="excluded">
+      <p class="eyebrow">Deliberately out of scope</p>
+      <p>
+        <b>Proportional assist, neurally adjusted ventilatory assist and closed-loop
+        adaptive support</b> are excluded by decision, not by omission. These are
+        vendor-proprietary control algorithms; a concept that reproduced their logic
+        could be verified against no published specification, and the resulting
+        behaviour would be a guess wearing a trademark. The exclusion is enforced by
+        the build so it cannot erode feature by feature.
+      </p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Monitoring</h2>
+    <p class="kicker">Nineteen values &middot; waveforms, loops and derived mechanics</p>
+
+    <p>
+      The concept treats the display as an instrument rather than a readout. Pressure,
+      flow and volume are available as continuous traces; the clinician selects which
+      numbers occupy the numeric field, and each carries a scale showing where the
+      value sits between its bounds &mdash; because a number alone says what it is,
+      not whether that is high.
+    </p>
+
+    <dl class="facts wide">
+      <div class="fact">
+        <dt>Waveforms</dt>
+        <dd><b>1 to 6 traces</b> from pressure, flow and volume, independently scaled,
+        sweep 5&nbsp;/&nbsp;10&nbsp;/&nbsp;15&nbsp;/&nbsp;20&nbsp;/&nbsp;30&nbsp;s</dd>
+      </div>
+      <div class="fact">
+        <dt>Loops</dt>
+        <dd><b>Pressure&ndash;volume</b> and flow&ndash;volume for the last complete
+        breath</dd>
+      </div>
+      <div class="fact">
+        <dt>Derived mechanics</dt>
+        <dd><b>Static compliance</b>, driving pressure, plateau pressure, intrinsic
+        PEEP, peak flow, rapid shallow breathing index</dd>
+      </div>
+      <div class="fact">
+        <dt>Freeze and measure</dt>
+        <dd><b>Two cursors</b> with a delta per trace and in time. Ventilation,
+        measurement and alarms continue underneath a frozen display</dd>
+      </div>
+    </dl>
+
+    <h3>Hold maneuvers</h3>
+    <p>
+      An inspiratory hold to <b>5&nbsp;s</b> and an expiratory hold to
+      <b>15&nbsp;s</b>, each releasing itself at its maximum whether or not anyone
+      is watching. A hold suspends ventilation to obtain a measurement, so the
+      measurement is presented on the main display and stays there until dismissed:
+      plateau pressure, driving pressure and static compliance from the inspiratory
+      hold; intrinsic PEEP from the expiratory one.
+    </p>
+
+    <h3>Oxygen</h3>
+    <p>
+      A <b>100&nbsp;% oxygen</b> override for 120&nbsp;s, started and ended from the
+      same control, with the remaining time shown on it. The override is bounded
+      rather than latching, and never modifies the set FiO&#8322; &mdash; an override
+      that changed the setting behind it would leave the patient on a value nobody
+      selected once it was forgotten.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Alarm system</h2>
+    <p class="kicker">Ten conditions &middot; three priorities &middot; audible and visual</p>
+
+    <p>
+      Priority is carried by the sound itself, so it can be recognised from across the
+      bed space without looking at the device. Pulse count and repetition rate both
+      change with priority, following the pattern shape IEC&nbsp;60601-1-8 describes.
+    </p>
+
+    <div class="priorities wide">
+      <div class="priority high">
+        <div>
+          <div class="priority-name">High priority</div>
+          <div class="priority-spec">5 pulses &middot; every 2.6&nbsp;s</div>
+        </div>
+        <svg viewBox="0 0 1000 40" preserveAspectRatio="none" role="img"
+             aria-label="High priority burst: five pulses at 0, 150, 300, 700 and 850 milliseconds">
+          <line x1="0" y1="34" x2="1000" y2="34" stroke="currentColor" stroke-opacity="0.18" stroke-width="1.5"/>
+          <g fill="var(--high)">
+            <rect x="0" y="6" width="120" height="28" rx="2"/>
+            <rect x="150" y="6" width="120" height="28" rx="2"/>
+            <rect x="300" y="6" width="120" height="28" rx="2"/>
+            <rect x="700" y="6" width="120" height="28" rx="2"/>
+            <rect x="850" y="6" width="120" height="28" rx="2"/>
+          </g>
+        </svg>
+        <div class="priority-eg">
+          High airway pressure &middot; Low airway pressure &middot; Apnea &middot; Oxygen supply
+        </div>
+      </div>
+
+      <div class="priority medium">
+        <div>
+          <div class="priority-name">Medium priority</div>
+          <div class="priority-spec">3 pulses &middot; every 7&nbsp;s</div>
+        </div>
+        <svg viewBox="0 0 1000 40" preserveAspectRatio="none" role="img"
+             aria-label="Medium priority burst: three pulses at 0, 190 and 380 milliseconds">
+          <line x1="0" y1="34" x2="1000" y2="34" stroke="currentColor" stroke-opacity="0.18" stroke-width="1.5"/>
+          <g fill="var(--medium)">
+            <rect x="0" y="6" width="150" height="28" rx="2"/>
+            <rect x="190" y="6" width="150" height="28" rx="2"/>
+            <rect x="380" y="6" width="150" height="28" rx="2"/>
+          </g>
+        </svg>
+        <div class="priority-eg">
+          High / low minute volume &middot; Low exhaled tidal volume &middot; High rate &middot; Battery
+        </div>
+      </div>
+
+      <div class="priority low">
+        <div>
+          <div class="priority-name">Low priority</div>
+          <div class="priority-spec">2 pulses &middot; every 20&nbsp;s</div>
+        </div>
+        <svg viewBox="0 0 1000 40" preserveAspectRatio="none" role="img"
+             aria-label="Low priority burst: two pulses at 0 and 210 milliseconds">
+          <line x1="0" y1="34" x2="1000" y2="34" stroke="currentColor" stroke-opacity="0.18" stroke-width="1.5"/>
+          <g fill="var(--low)">
+            <rect x="0" y="6" width="170" height="28" rx="2"/>
+            <rect x="210" y="6" width="170" height="28" rx="2"/>
+          </g>
+        </svg>
+        <div class="priority-eg">Pre-use check outstanding</div>
+      </div>
+    </div>
+    <p class="kicker" style="margin-top:12px">
+      Bursts drawn to scale across a one-second window. Where several conditions are
+      active, only the highest priority is annunciated &mdash; several at once produce
+      noise from which no priority can be read.
+    </p>
+
+    <h3>Silencing, and the difference that matters</h3>
+    <p>
+      Two separate controls, because they are two separate things. Conflating them
+      leaves the clinician unsure which they pressed, and that matters most in the
+      case where they believe sound is coming back and it is not.
+    </p>
+
+    <div class="table-wrap wide">
+      <table>
+        <caption>Audio pause compared with audio off</caption>
+        <thead><tr><th>Property</th><th>Audio pause</th><th>Audio off</th></tr></thead>
+        <tbody>
+          <tr><td>Duration</td><td>120 s</td><td>Indefinite</td></tr>
+          <tr><td>Ends by itself</td><td>Yes, automatically</td><td>No</td></tr>
+          <tr><td>Confirmation</td><td>None</td><td>Required, stating what remains</td></tr>
+          <tr><td>Indication</td><td>Countdown on the control</td><td>Persistent marker, always visible</td></tr>
+          <tr><td>Survives a restart</td><td>No, deliberately</td><td>Yes</td></tr>
+          <tr><td>Ended by a worse alarm</td><td>Yes</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      A pause silences the conditions present when it was pressed. A condition of
+      higher priority arriving afterwards was never silenced by anyone, so the pause
+      ends and it is heard. Deliberate audio-off is unaffected: that was a decision
+      about the device, not about a condition. Restoring audio is never gated &mdash;
+      guarding the direction that restores a safeguard only teaches the clinician to
+      dismiss the guard that matters.
+    </p>
+    <p>
+      Visual annunciation is independent of every audio state, and of the screen lock.
+      Alarm limits are set per condition, or derived from present measurements by an
+      autoset that <em>proposes</em> rather than applies: every derived value is
+      clamped and shown for review before anything changes.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Operating the device</h2>
+    <p class="kicker">Where the interface deliberately slows the clinician down</p>
+
+    <p>
+      Confirmation is spent where a mistake is expensive and withheld where it is not.
+      A guard that fires constantly is a guard the clinician learns to dismiss, so the
+      concept is explicit about which actions earn one.
+    </p>
+
+    <ul class="plain">
+      <li>
+        <b>Settings are staged.</b> While ventilating, edits accumulate in a pending
+        set and reach the patient only when accepted &mdash; one acknowledgement for a
+        batch, not one per keypress.
+      </li>
+      <li>
+        <b>The confirmation itemises.</b> Each changed value is named with its before
+        and after, so what is being accepted is visible at the moment of accepting it.
+      </li>
+      <li>
+        <b>Hazardous transitions are confirmed.</b> Starting, stopping, changing mode,
+        changing patient category and turning alarm audio off. Turning audio back on
+        is not.
+      </li>
+      <li>
+        <b>The setup lockout is narrow.</b> Only controls that bound a setting range
+        &mdash; patient category, demographics, feature configuration &mdash; lock
+        during ventilation, because changing them would move the bounds underneath the
+        clinician. Nothing else locks.
+      </li>
+      <li>
+        <b>Urgent actions are never more than one press away.</b> Stop, 100&nbsp;%
+        oxygen and capture are present on the status bar from every screen. A control
+        reached through a menu is reached too late.
+      </li>
+      <li>
+        <b>Screen lock guards against contact, not against reading.</b> Released by a
+        deliberate 1.2&nbsp;s hold rather than a tap, for transport and cleaning. The
+        display stays fully readable and alarm annunciation is never suppressed by it.
+      </li>
+      <li>
+        <b>Nothing resumes from memory.</b> The device always powers up into standby
+        with nothing being delivered. A device that appeared to resume ventilation
+        from stored state would be showing delivery that is not occurring.
+      </li>
+    </ul>
+
+    <h3>The display is arranged by the clinician</h3>
+    <p>
+      Panels move between and within columns, dividers resize them, panels hide and
+      return, and four named arrangements apply a complete layout in one press. Sizes
+      are proportions rather than fixed dimensions, so an arrangement survives a
+      change of screen. Resizing takes from one side and gives to the other, so the
+      layout cannot creep as it is adjusted; panels hold a minimum size and the last
+      one cannot be hidden, because a panel shrunk to nothing is indistinguishable
+      from one that has failed.
+    </p>
+    <p>
+      Rearranging is a mode the clinician selects. During ventilation their hand is on
+      the display continuously, and a layout that reorganises itself on a stray touch
+      is worse than one that cannot be changed. Ventilation, measurement and alarm
+      annunciation all continue while it is on. A separate display-scale selection
+      covers reading distance, from arm&rsquo;s length to across the bed space.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Records</h2>
+    <p class="kicker">Event log &middot; retention specified per class</p>
+
+    <p>
+      Every alarm transition and every clinician action is recorded: setting changes
+      with their before and after, mode changes, state transitions, maneuvers,
+      captures, self tests, and each change of alarm audio or oxygen state. The log is
+      filterable by category and severity, and exportable.
+    </p>
+    <p>
+      Retention is specified <em>per class</em> rather than as a single ceiling:
+      <b>200 alarm events</b> and <b>1000 events of every other kind</b>, ageing out
+      independently. Under one shared cap a busy afternoon of adjustments would push
+      the morning&rsquo;s alarms out of the record, and the alarms are the part worth
+      reconstructing after an event.
+    </p>
+    <p>
+      Configuration persists across a restart; the temporary audio pause deliberately
+      does not, since a suspension that outlived a restart would be an off switch
+      wearing a countdown. What is held is disclosed to the operator, with the space
+      it occupies and how full each retention class is, and can be cleared behind a
+      confirmation that names the scope.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Editions and configuration</h2>
+    <p class="kicker">Three editions &middot; four capabilities that can never be switched off</p>
+
+    <p>
+      The concept assumes a device sold once and extended by licence, so that a
+      hospital buys the depth it practises at and can widen it later without replacing
+      the unit.
+    </p>
+
+    <div class="table-wrap wide">
+      <table>
+        <caption>Editions</caption>
+        <thead><tr><th>Edition</th><th>Adds</th><th>Intended for</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Base</td>
+            <td>Volume and pressure control, full alarm system, self tests, event log</td>
+            <td>General ward step-down and transport</td>
+          </tr>
+          <tr>
+            <td>Advanced</td>
+            <td>PRVC, SIMV, pressure support and CPAP, hold maneuvers, loops, captures, configurable waveform layout</td>
+            <td>General intensive care</td>
+          </tr>
+          <tr>
+            <td>Premium</td>
+            <td>BiLevel, APRV, alternative inspiratory flow patterns</td>
+            <td>Tertiary and specialist units</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Licensing is a commercial boundary and never a safety one. Core modes, the alarm
+      system, self tests and the event log are mandatory: they stay enabled whatever a
+      licence says, so a malformed or tampered configuration cannot switch off a
+      safety function. Capabilities not licensed are absent from the device rather
+      than greyed out, so an unlicensed mode is unreachable rather than teasing.
+    </p>
+
+    <dl class="facts wide">
+      <div class="fact">
+        <dt>Languages</dt>
+        <dd><b>English, German, French, Spanish</b>, with source-language fallback for
+        any string not yet translated</dd>
+      </div>
+      <div class="fact">
+        <dt>Units</dt>
+        <dd><b>Five quantities</b> &mdash; pressure, volume, length, weight, flow
+        &mdash; each selectable, held internally in one canonical unit and converted
+        only at display so a value cannot be converted twice</dd>
+      </div>
+      <div class="fact">
+        <dt>Display</dt>
+        <dd><b>Four themes</b> including a high-contrast set, and four display scales
+        for viewing distance</dd>
+      </div>
+      <div class="fact">
+        <dt>Access</dt>
+        <dd><b>Five operator profiles</b> &mdash; intensivist, ICU nurse, respiratory
+        therapist, biomedical engineer, trainee &mdash; each with its own rights</dd>
+      </div>
+    </dl>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Design basis</h2>
+    <p class="kicker">Specification, hazard analysis and traceability, carried in the device</p>
+
+    <p>
+      The concept is documented to the discipline a regulated programme would apply,
+      and the documents are rendered inside the device itself rather than filed
+      elsewhere &mdash; so the specification is inspectable from the thing it
+      specifies and cannot drift out of step with it.
+    </p>
+
+    <div class="stats wide">
+      <div class="stat"><b>132</b><span>Requirements</span></div>
+      <div class="stat"><b>60</b><span>DFMEA entries</span></div>
+      <div class="stat"><b>85</b><span>Test cases</span></div>
+      <div class="stat"><b>43</b><span>Safety reqs</span></div>
+      <div class="stat"><b>5</b><span>Operator profiles</span></div>
+      <div class="stat"><b>100%</b><span>Traced both ways</span></div>
+    </div>
+
+    <div class="table-wrap wide">
+      <table>
+        <caption>Requirement specification by type</caption>
+        <thead><tr><th>Type</th><th class="num">Count</th><th>Scope</th></tr></thead>
+        <tbody>
+          <tr><td>Functional</td><td class="num">44</td><td>Breath delivery, measurement, modes, persistence</td></tr>
+          <tr><td>Safety</td><td class="num">43</td><td>Alarms, lockouts, confirmations, degradation</td></tr>
+          <tr><td>Usability</td><td class="num">28</td><td>Reachability, legibility, disclosure, arrangement</td></tr>
+          <tr><td>Regulatory</td><td class="num">10</td><td>Alarm priority, labelling, identification, retention</td></tr>
+          <tr><td>Performance</td><td class="num">3</td><td>Timing and tolerance</td></tr>
+          <tr><td>Security</td><td class="num">2</td><td>Access rights, confinement of stored data</td></tr>
+          <tr><td>Interface</td><td class="num">2</td><td>Display and control conventions</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Requirements are written to INCOSE characteristics &mdash; necessary, singular,
+      unambiguous, complete, feasible and verifiable &mdash; with the device as
+      subject and rationale kept out of the statement. The characteristics that can be
+      checked mechanically are checked on every build: exactly one <code>shall</code>
+      per requirement, no vague or unverifiable terms, and every traceability link
+      resolving in both directions. A requirement that fails those checks does not
+      ship.
+    </p>
+    <p>
+      Hazard analysis follows ISO&nbsp;14971 and design-FMEA structure: for each item
+      and its function, the failure mode, effect, cause, the controls in place and the
+      residual position. Severity, occurrence and detection are scored 1&ndash;10 and
+      RPN is computed &mdash; but used only to order the file for review, never as an
+      acceptance criterion, because a high-severity failure stays unacceptable however
+      rarely it occurs. Every hazard resolves to at least one mitigating requirement,
+      and every requirement to at least one hazard and one test.
+    </p>
+
+    <h3>Standards the concept was written against</h3>
+    <div class="table-wrap wide">
+      <table>
+        <caption>Referenced standards &mdash; informative, not a compliance claim</caption>
+        <thead><tr><th>Standard</th><th class="num">Reqs</th><th>Applied to</th></tr></thead>
+        <tbody>
+          <tr><td>IEC 60601-1-8</td><td class="num">10</td><td>Alarm priority, annunciation, audio pause and inactivation</td></tr>
+          <tr><td>IEC 62366-1</td><td class="num">4</td><td>Usability engineering and use-related risk</td></tr>
+          <tr><td>IEC 62304</td><td class="num">2</td><td>Software lifecycle record</td></tr>
+          <tr><td>EU MDR 2017/745</td><td class="num">2</td><td>Labelling and device identification</td></tr>
+          <tr><td>ISO 15223-1</td><td class="num">1</td><td>Symbols</td></tr>
+          <tr><td>ISO 14971</td><td class="num">&mdash;</td><td>Structure of the hazard file</td></tr>
+          <tr><td>INCOSE Guide</td><td class="num">&mdash;</td><td>Requirement writing characteristics</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      These are the conventions the concept follows so that what it specifies would be
+      recognisable to anyone who knows the equipment. They are not a compliance claim:
+      no conformity assessment, acoustic verification, electrical safety testing,
+      biocompatibility evaluation or clinical evaluation has been performed, and none
+      of the content is reviewed, approved or under change control.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>How the concept was proved</h2>
+    <p class="kicker">The specification was executed rather than only written</p>
+
+    <p>
+      A device definition that is only prose can assert anything. This one was built
+      as a working simulation, so its behaviour could be operated and measured &mdash;
+      which is the only way a claim like &ldquo;the frozen display does not change&rdquo;
+      or &ldquo;high priority sounds five pulses every 2.6&nbsp;seconds&rdquo; can be
+      shown rather than stated.
+    </p>
+
+    <div class="callout">
+      <p class="eyebrow">The lung the concept is exercised against</p>
+      <div class="equation">P<sub>aw</sub> <span class="op">=</span> PEEP <span class="op">+</span> V/C <span class="op">+</span> Q&middot;R <span class="op">&minus;</span> P<sub>mus</sub></div>
+      <p style="margin-bottom:0;font-size:15px;color:var(--ink-2)">
+        Breaths are computed from a single-compartment lung model at 50&nbsp;Hz, not
+        replayed from recordings. Exhalation is passive exponential decay with time
+        constant <code>&tau; = R &middot; C</code>. Because the physics is integrated
+        rather than scripted, device behaviour emerges: a stiff lung raises pressure
+        for the same volume, and gas trapping produces intrinsic PEEP at a high rate
+        without either being coded as a case.
+      </p>
+    </div>
+
+    <p>
+      Four illustrative lungs &mdash; normal, ARDS, COPD and pulmonary fibrosis
+      &mdash; and four levels of spontaneous effort, across three patient categories,
+      give the concept something to be wrong against. Verification runs at two levels:
+      the delivery logic and every safety decision are tested directly, and above them
+      the assembled device is operated as a clinician would operate it, with the
+      display and the audible output <em>measured</em> rather than assumed.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Where the concept stops</h2>
+    <p class="kicker">Undefined by decision &mdash; and therefore not claimed</p>
+
+    <p>
+      A concept that pretends to be complete is more dangerous than one that names its
+      edges. The following are outside this definition entirely, and nothing above
+      should be read as covering them.
+    </p>
+
+    <ul class="plain">
+      <li>
+        <b>All hardware.</b> No pneumatics, blender, valves, sensors, expiratory
+        cassette, patient circuit, humidification, enclosure, power supply or battery
+        is defined. Power and battery appear in the interface only as indications, and
+        are marked as simulated.
+      </li>
+      <li>
+        <b>Gas delivery and mixing.</b> FiO&#8322; is a setting and an oxygenation
+        input, not a modelled blender. Oxygen supply is a monitored condition, not a
+        specified subsystem.
+      </li>
+      <li>
+        <b>Patient monitoring hardware.</b> SpO&#8322; is synthetic and derived; on a
+        real device it comes from a separate oximetry module. It shows the shape of a
+        relationship, not a predicted value.
+      </li>
+      <li>
+        <b>Lung model fidelity.</b> Single compartment only. Regional heterogeneity,
+        recruitment and derecruitment, and pendelluft are not represented.
+      </li>
+      <li>
+        <b>Clinical validation.</b> No value here has been compared against measured
+        patient data. Compliance, resistance, saturation and every derived mechanic
+        are illustrative, and the four lungs are labelled as such throughout.
+      </li>
+      <li>
+        <b>Regulatory and quality processes.</b> No design history file, no
+        verification and validation protocols, no risk management report, no clinical
+        evaluation, no post-market surveillance, no notified body involvement.
+      </li>
+    </ul>
+
+    <h3>If the concept were taken further</h3>
+    <p>
+      Capnography and EtCO&#8322;. High-flow oxygen therapy, which needs a flow-source
+      model rather than a pressure-source one. Sigh and manual breaths, automatic tube
+      compensation, P0.1, NIF/MIP and nebuliser synchronisation. Trend graphing over
+      time in place of the present capture-and-compare view. And design documents as
+      structured data alongside the requirements, hazards and test cases, completing
+      the documentation set.
+    </p>
+  </section>
+
+</main>
+
+<footer class="band">
+  <div class="footer-inner">
+    <div>
+      ICU Ventilator &middot; concept device definition<br>
+      Not a medical device &middot; never manufactured &middot; not certified &middot; not for clinical use
+    </div>
+    <div>
+      Specified, analysed and executed as a simulation<br>
+      All clinical values illustrative and not clinically validated
+    </div>
+  </div>
+</footer>
