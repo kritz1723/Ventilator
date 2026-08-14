@@ -28,6 +28,7 @@ import { MODES, DEFAULT_MODE } from './engine/ventilatorModes/index.js'
 import {
   DEFAULT_LICENCE, isEnabled, licensedModes, resolveActiveMode,
 } from './config/licensing.js'
+import { DEFAULT_UNITS } from './config/units.js'
 import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
 import {
   CONFIRMABLE, pendingDiff, clampToRanges,
@@ -62,6 +63,7 @@ export default function App() {
   const [logOpen, setLogOpen] = useState(false)
   const [layout, setLayout] = useState(DEFAULT_LAYOUT)
   const [licence, setLicence] = useState(DEFAULT_LICENCE)
+  const [units, setUnits] = useState(DEFAULT_UNITS)
   // While ventilating, edits go to a pending copy and reach the patient only
   // when accepted. In standby they apply directly — nothing is being
   // delivered, so there is nothing to guard.
@@ -336,6 +338,11 @@ export default function App() {
             setLicence(next)
             log({ category: EVENT_CATEGORY.SETTING, message: 'Feature configuration changed' })
           }}
+          units={units}
+          onUnitsChange={(next) => {
+            setUnits(next)
+            log({ category: EVENT_CATEGORY.SETTING, message: 'Display units changed' })
+          }}
           canEdit={!ventilating}
           blockedReason="Feature configuration is unavailable while ventilating. Stop ventilation to make changes."
           onExit={() => {
@@ -411,6 +418,7 @@ export default function App() {
                 settings={settings}
                 selected={selectedMeasurements}
                 onSelectedChange={setSelectedMeasurements}
+                units={units}
               />
               {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
             </div>

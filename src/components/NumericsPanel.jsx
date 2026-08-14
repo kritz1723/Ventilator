@@ -1,9 +1,23 @@
 import { useState } from 'react'
+import { format, unitLabel } from '../config/units.js'
 import { MEASUREMENT_CATALOG } from '../config/measurementCatalog.js'
 
-export default function NumericsPanel({ numerics, measurements, settings, selected, onSelectedChange }) {
+export default function NumericsPanel({
+  numerics, measurements, settings, selected, onSelectedChange, units,
+}) {
   const [picking, setPicking] = useState(false)
   const ctx = { numerics, measurements, settings }
+
+  // Entries tagged with a quantity are held canonically and converted here,
+  // at display. The precision comes from the unit's own definition rather
+  // than being guessed per call site, so cmH2O reads whole and hPa reads to
+  // a decimal without the caller knowing which is in force.
+  const valueOf = (m) => {
+    if (!units || !m.quantity || !m.raw) return m.read(ctx)
+    return format(m.raw(ctx), units, m.quantity, { withUnit: false })
+  }
+
+  const unitOf = (m) => (units && m.quantity ? unitLabel(units, m.quantity) : m.unit)
   const shown = MEASUREMENT_CATALOG.filter((m) => selected.includes(m.id))
 
   const toggle = (id) => {
@@ -49,8 +63,8 @@ export default function NumericsPanel({ numerics, measurements, settings, select
           {shown.map((m) => (
             <div key={m.id} className={`numeric numeric-${m.tone}`}>
               <span className="numeric-label">{m.label}</span>
-              <span className="numeric-value tnum">{m.read(ctx)}</span>
-              <span className="numeric-unit">{m.unit}</span>
+              <span className="numeric-value tnum">{valueOf(m)}</span>
+              <span className="numeric-unit">{unitOf(m)}</span>
             </div>
           ))}
         </div>
