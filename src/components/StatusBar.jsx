@@ -8,7 +8,7 @@ import { PATIENT_CATEGORIES } from '../engine/patientCategories.js'
 export default function StatusBar({
   settings, availableModes, patientCategory, ventilating,
   alarms, onModeChange, modeLocked, t,
-  themes, theme, onThemeChange, onOpenLog, onOpenInfo, logCount,
+  themes, theme, onThemeChange, onOpenLog, onOpenInfo, logCount, onStopVentilation,
 }) {
   const [clock, setClock] = useState(() => new Date())
 
@@ -100,6 +100,17 @@ export default function StatusBar({
           </svg>
           {alarms.length}
         </span>
+        {/* Stopping ventilation is a decision that can be needed at once, so
+            it stays on the top bar rather than inside a settings page. It is
+            still confirmed before it takes effect. */}
+        {ventilating && onStopVentilation && (
+          <button type="button" className="status-stop" onClick={onStopVentilation}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            {t('action.stop')}
+          </button>
+        )}
       </div>
     </header>
   )

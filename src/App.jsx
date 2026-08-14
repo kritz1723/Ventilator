@@ -26,6 +26,7 @@ import LungHero from './components/LungHero.jsx'
 import SettingTiles from './components/SettingTiles.jsx'
 import SettingsToolbar from './components/SettingsToolbar.jsx'
 import SaveConfirmDialog from './components/SaveConfirmDialog.jsx'
+import MeasurementPicker from './components/MeasurementPicker.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -95,6 +96,7 @@ export default function App() {
   const [settingsEditing, setSettingsEditing] = useState(false)
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [now, setNow] = useState(Date.now())
 
   const settingsEditingRef = useRef(false)
@@ -496,6 +498,7 @@ export default function App() {
             onOpenLog={() => setLogOpen(true)}
             onOpenInfo={() => setInfoOpen(true)}
             logCount={events.length}
+            onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
             t={t}
           />
 
@@ -506,6 +509,7 @@ export default function App() {
               settings={settings}
               selected={selectedMeasurements}
               units={units}
+              onConfigure={() => setPickerOpen(true)}
             />
 
             <div className="shell-centre">
@@ -692,6 +696,12 @@ export default function App() {
         </main>
       )}
 
+      <MeasurementPicker
+        open={pickerOpen}
+        selected={selectedMeasurements}
+        onSelectedChange={setSelectedMeasurements}
+        onClose={() => setPickerOpen(false)}
+      />
       <SaveConfirmDialog
         open={saveConfirmOpen}
         changes={draftChanges}

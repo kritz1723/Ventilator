@@ -1740,3 +1740,47 @@
 .save-from { color: var(--text-muted); text-decoration: line-through; }
 .save-arrow { color: var(--text-muted); }
 .save-to { color: var(--ok); font-weight: 700; }
+
+/* ---------- Numeric rail configure ---------- */
+.rail-configure {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px dashed var(--border-strong);
+  color: var(--text-muted); font-size: 11px; font-weight: 600;
+}
+.rail-configure:hover { color: var(--accent); border-color: rgba(76,196,245,0.5); }
+
+/* ---------- Measurement picker ---------- */
+.picker-group { margin-bottom: 14px; }
+.picker-group-title {
+  display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+}
+.picker-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 6px; }
+.picker-option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-soft); color: var(--text-muted);
+}
+.picker-option.on { color: var(--text-primary); border-color: var(--accent); background: rgba(76,196,245,0.1); }
+.picker-option.on.tone-paw { border-color: var(--paw); }
+.picker-option.on.tone-flow { border-color: var(--flow); }
+.picker-option.on.tone-volume { border-color: var(--volume); }
+.picker-option.on.tone-mech { border-color: var(--mech); }
+.picker-option:disabled { opacity: 0.75; cursor: not-allowed; }
+.picker-label { font-size: 12.5px; font-weight: 650; }
+.picker-unit { font-size: 9.5px; color: var(--text-muted); }
+
+/* ---------- Stop ventilation ---------- */
+.status-stop {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  background: linear-gradient(180deg, rgba(255,95,109,0.24), rgba(255,95,109,0.1));
+  border: 1px solid rgba(255,95,109,0.5); color: var(--danger);
+}
+.status-stop:hover { filter: brightness(1.2); }
+.setup-live-tag {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; color: var(--ok);
+  background: rgba(95,224,143,0.12); border: 1px solid rgba(95,224,143,0.35);
+}

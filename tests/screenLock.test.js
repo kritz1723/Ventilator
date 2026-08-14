@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   LOCK_STATE, SETUP_CONTROLS, UNLOCK_HOLD_MS,
-  isSetupLocked, setupLockReason, isActionPermitted,
+  isSetupLocked, setupLockReason, isActionPermitted, isSimulationControl,
   unlockProgress, isUnlockComplete,
 } from '../src/engine/screenLock.js'
 
@@ -11,10 +11,23 @@ describe('setup lockout', () => {
     expect(isSetupLocked(false)).toBe(false)
   })
 
-  it('covers the controls that describe the patient rather than the therapy', () => {
+  it('covers the controls that bound the setting ranges', () => {
     expect(SETUP_CONTROLS).toEqual(expect.arrayContaining([
-      'patientCategory', 'patientPreset', 'spontaneousEffort', 'featureConfiguration',
+      'patientCategory', 'featureConfiguration',
     ]))
+  })
+
+  it('leaves the simulation inputs unlocked', () => {
+    // Changing lung mechanics or effort mid-ventilation is the demonstration
+    // the simulator exists to give, so these must never be in the lockout.
+    for (const control of ['patientPreset', 'spontaneousEffort']) {
+      expect(SETUP_CONTROLS, control).not.toContain(control)
+      expect(isSimulationControl(control), control).toBe(true)
+    }
+  })
+
+  it('does not treat a bounding control as a simulation input', () => {
+    expect(isSimulationControl('patientCategory')).toBe(false)
   })
 
   it('states a reason for every locked control', () => {
