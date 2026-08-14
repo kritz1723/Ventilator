@@ -5,6 +5,7 @@ import { getBreathTiming } from '../engine/ventilatorModes/breathTiming.js'
 import { evaluateAlarms } from '../engine/alarms.js'
 import { computeMeasurements } from '../engine/measurements.js'
 import { MANEUVER, HOLD_DURATION_SECONDS, maneuverResult } from '../engine/maneuvers.js'
+import { EFFORT_PRESETS, DEFAULT_EFFORT } from '../engine/spontaneousEffort.js'
 
 const SAMPLE_HZ = 50
 // Buffer the longest selectable sweep; the display slices the tail it needs,
@@ -140,9 +141,14 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical 
     }
 
     const impl = (MODES[activeModeRef.current] ?? MODES[DEFAULT_MODE]).impl
+    // Modes read the resolved effort object rather than the preset id.
+    const resolvedSettings = {
+      ...activeSettings,
+      effort: EFFORT_PRESETS[activeSettings.effort] ?? EFFORT_PRESETS[DEFAULT_EFFORT],
+    }
     const result = impl.step({
       state: modeStateRef.current,
-      settings: activeSettings,
+      settings: resolvedSettings,
       patient: patientRef.current,
       dt,
     })

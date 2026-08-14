@@ -11,6 +11,9 @@ export const DEFAULT_SETTINGS = {
   peep: 5, // cmH2O
   pauseTime: 0.3, // s, end-inspiratory pause
   fio2: 40, // %, display only — gas mixing is not modelled
+  pSupport: 10, // cmH2O above PEEP, used in PSV and for supported SIMV breaths
+  cycleOffPercent: 25, // % of peak inspiratory flow at which a supported breath cycles
+  effort: 'none', // spontaneous effort preset id
   riseTime: 0.2, // s, displayed as a concept control
   triggerFlow: 2, // L/min, displayed as a concept control
   alarmLimits: {

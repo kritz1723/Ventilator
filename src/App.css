@@ -1171,3 +1171,9 @@
   background: linear-gradient(180deg, rgba(76,196,245,0.3), rgba(76,196,245,0.12));
   border-color: rgba(76,196,245,0.55); color: var(--accent);
 }
+.field-stacked { flex-direction: column; align-items: stretch; gap: 5px; }
+.preset-warn {
+  margin: 0; font-size: 10.5px; line-height: 1.4; color: var(--warning);
+  padding: 7px 9px; border-radius: var(--radius-sm);
+  background: rgba(255,190,77,0.09); border: 1px solid rgba(255,190,77,0.3);
+}
