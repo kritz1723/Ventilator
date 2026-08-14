@@ -3,6 +3,7 @@ import { MODES } from '../engine/ventilatorModes/index.js'
 import { EFFORT_PRESETS } from '../engine/spontaneousEffort.js'
 import { FLOW_PATTERNS } from '../engine/flowPatterns.js'
 import { rangeFor, COMMON_RANGES } from '../engine/patientCategories.js'
+import { HOLD_LIMITS } from '../engine/maneuvers.js'
 
 function NumberField({ label, unit, value, onChange, min, max, step }) {
   const clamp = (v) => Math.min(Math.max(v, min), max)
@@ -34,6 +35,7 @@ export default function ControlPanel({
   onManeuver,
   onStopVentilation,
   onAutoset,
+  holdState = {},
   setupLocked = false,
   t = (k) => k,
 }) {
@@ -153,9 +155,35 @@ export default function ControlPanel({
       <section className="panel control-section">
         <span className="panel-title">{t('panel.maneuvers')}</span>
         <div className="maneuver-row">
-          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('inspHold')}>{t('maneuver.inspHold')}</button>
-          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('expHold')}>{t('maneuver.expHold')}</button>
+          {[
+            ['inspHold', t('maneuver.inspHold')],
+            ['expHold', t('maneuver.expHold')],
+          ].map(([id, label]) => {
+            const active = holdState.active === id
+            const pending = holdState.pending === id
+            const remaining = active ? Math.ceil(holdState.remaining ?? 0) : null
+            return (
+              <button
+                key={id}
+                type="button"
+                role="switch"
+                aria-checked={active}
+                className={`btn btn-ghost hold-toggle${active ? ' on' : ''}${pending ? ' armed' : ''}`}
+                onClick={() => onManeuver(id)}
+              >
+                <span className="hold-lamp" aria-hidden="true" />
+                <span className="hold-label">{label}</span>
+                <span className="hold-status">
+                  {active ? `${remaining}s` : pending ? 'Armed' : `max ${HOLD_LIMITS[id].maxSeconds}s`}
+                </span>
+              </button>
+            )
+          })}
         </div>
+        <p className="hold-note">
+          A hold suspends ventilation and releases itself at its maximum.
+          Press again to release early.
+        </p>
       </section>
       )}
 

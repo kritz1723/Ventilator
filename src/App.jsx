@@ -104,7 +104,7 @@ export default function App() {
   const flushLeft = flushRemaining(flush, now)
 
   const {
-    waveform, loop, numerics: rawNumerics, measurements, alarms, spo2, live, reset,
+    waveform, loop, numerics: rawNumerics, measurements, alarms, spo2, live, holdState, reset,
     maneuver, startManeuver, clearManeuver,
   } = useVentilatorEngine({
     settings,
@@ -450,6 +450,7 @@ export default function App() {
             t={t}
             onAutoset={requestAutoset}
             setupLocked={setupLocked}
+            holdState={holdState}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">

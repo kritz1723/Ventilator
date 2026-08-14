@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { maneuverResult, holdPressure, MANEUVER } from '../src/engine/maneuvers.js'
+import {
+  maneuverResult, holdPressure, MANEUVER,
+  HOLD_LIMITS, HOLD_DURATION_SECONDS, maxHoldSeconds, holdRemaining, shouldAutoRelease,
+} from '../src/engine/maneuvers.js'
 
 describe('holdPressure', () => {
   it('equals PEEP when the lung has returned to its baseline volume', () => {
@@ -66,5 +69,38 @@ describe('expiratory hold', () => {
       peep: 0,
     })
     expect(result.readings.find((r) => r.label === 'PEEPi').value).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('hold bounds', () => {
+  it('bounds every maneuver with a maximum duration', () => {
+    for (const type of Object.keys(HOLD_LIMITS)) {
+      expect(maxHoldSeconds(type), type).toBeGreaterThan(0)
+    }
+  })
+
+  it('allows an expiratory hold longer than an inspiratory one', () => {
+    // Trapped gas needs time to equilibrate before total PEEP can be read,
+    // whereas an inspiratory hold suspends delivery and is kept short.
+    expect(maxHoldSeconds('expHold')).toBeGreaterThan(maxHoldSeconds('inspHold'))
+  })
+
+  it('auto-releases once the maximum is reached', () => {
+    for (const type of Object.keys(HOLD_LIMITS)) {
+      const max = maxHoldSeconds(type)
+      expect(shouldAutoRelease(type, max - 0.1), type).toBe(false)
+      expect(shouldAutoRelease(type, max), type).toBe(true)
+      expect(shouldAutoRelease(type, max + 5), type).toBe(true)
+    }
+  })
+
+  it('counts down and never reports negative time remaining', () => {
+    expect(holdRemaining('expHold', 0)).toBe(maxHoldSeconds('expHold'))
+    expect(holdRemaining('expHold', 5)).toBe(maxHoldSeconds('expHold') - 5)
+    expect(holdRemaining('expHold', 999)).toBe(0)
+  })
+
+  it('falls back to the default bound for an unknown maneuver', () => {
+    expect(maxHoldSeconds('nonsense')).toBe(HOLD_DURATION_SECONDS)
   })
 })

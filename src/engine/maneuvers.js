@@ -15,7 +15,38 @@ export const MANEUVER = {
   EXPIRATORY_HOLD: 'expHold',
 }
 
+// Maximum hold durations.
+//
+// A hold interrupts ventilation, so it must end on its own rather than
+// depending on the operator to release it. Each is therefore bounded and
+// auto-releases at its maximum.
+//
+// These durations are illustrative, chosen to be defensible rather than
+// cited: an inspiratory hold is kept short because it suspends delivery,
+// while an expiratory hold is allowed longer because trapped gas needs time
+// to equilibrate before total PEEP can be read. I could not find a standard
+// that fixes these numbers — a real device would derive and justify its own,
+// and both are configurable here so a sourced value can replace them.
+export const HOLD_LIMITS = {
+  inspHold: { maxSeconds: 5, label: 'Inspiratory hold' },
+  expHold: { maxSeconds: 15, label: 'Expiratory hold' },
+}
+
+// Retained for the default engagement duration when no explicit release
+// occurs; superseded per maneuver by HOLD_LIMITS.
 export const HOLD_DURATION_SECONDS = 3
+
+export function maxHoldSeconds(type) {
+  return HOLD_LIMITS[type]?.maxSeconds ?? HOLD_DURATION_SECONDS
+}
+
+export function holdRemaining(type, elapsed) {
+  return Math.max(0, maxHoldSeconds(type) - elapsed)
+}
+
+export function shouldAutoRelease(type, elapsed) {
+  return elapsed >= maxHoldSeconds(type)
+}
 
 // During a hold there is no flow, so airway pressure equals the elastic
 // recoil pressure of the gas still in the lung above FRC, plus PEEP.
