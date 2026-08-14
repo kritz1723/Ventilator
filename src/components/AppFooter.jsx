@@ -1,12 +1,12 @@
 import { BUILD_ID, formatBuildTime } from '../config/buildInfo.js'
 import { SOFTWARE_RECORD } from '../config/deviceIdentity.js'
 
-export default function AppFooter() {
+export default function AppFooter({ t }) {
   const built = formatBuildTime()
 
   return (
     <footer className="app-footer">
-      <span className="footer-sim">Simulation only — not for clinical use</span>
+      <span className="footer-sim">{t ? t('app.footerSim') : 'Simulation only — not for clinical use'}</span>
       <span className="footer-build">
         <span className="footer-label">Version</span>
         <span className="tnum">{SOFTWARE_RECORD.applicationVersion}</span>

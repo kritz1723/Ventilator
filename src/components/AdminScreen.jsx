@@ -5,10 +5,12 @@ import { USER_PROFILES } from '../docs/userProfiles.js'
 import { TEST_CASES, testCaseById, automatedCount } from '../docs/testCases.js'
 import LicensingTab from './LicensingTab.jsx'
 import UnitsTab from './UnitsTab.jsx'
+import LanguageTab from './LanguageTab.jsx'
 
 const TABS = [
   { id: 'licensing', label: 'Features' },
   { id: 'units', label: 'Units' },
+  { id: 'language', label: 'Language' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'risks', label: 'Risk / DFMEA' },
   { id: 'tests', label: 'Test cases' },
@@ -270,7 +272,8 @@ function ProfilesTab() {
 }
 
 export default function AdminScreen({
-  onExit, licence, onLicenceChange, canEdit, blockedReason, units, onUnitsChange,
+  onExit, licence, onLicenceChange, canEdit, blockedReason,
+  units, onUnitsChange, language, onLanguageChange, t = (k) => k,
 }) {
   const [tab, setTab] = useState('licensing')
 
@@ -285,7 +288,7 @@ export default function AdminScreen({
             under change control.
           </p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={onExit}>Exit configuration</button>
+        <button type="button" className="btn btn-ghost" onClick={onExit}>{t('action.exitConfig')}</button>
       </header>
 
       <nav className="drawer-tabs admin-tabs">
@@ -309,6 +312,9 @@ export default function AdminScreen({
           />
         )}
         {tab === 'units' && <UnitsTab units={units} onUnitsChange={onUnitsChange} />}
+        {tab === 'language' && (
+          <LanguageTab language={language} onLanguageChange={onLanguageChange} />
+        )}
         {tab === 'requirements' && <RequirementsTab />}
         {tab === 'risks' && <RisksTab />}
         {tab === 'tests' && <TestsTab />}
