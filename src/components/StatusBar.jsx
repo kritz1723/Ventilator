@@ -10,6 +10,7 @@ export default function StatusBar({
   alarms, onModeChange, modeLocked, t,
   themes, theme, onThemeChange, onOpenLog, onOpenInfo, logCount, onStopVentilation,
   onOxygenFlush, flushActive, flushRemaining, onCapture, captureCount,
+  audioEnabled, audioState, audioPaused, pauseRemaining, onPauseAudio, onAudioEnabledChange,
 }) {
   const [clock, setClock] = useState(() => new Date())
 
@@ -101,6 +102,49 @@ export default function StatusBar({
           </svg>
           {alarms.length}
         </span>
+        {/* Alarm audio. Two separate controls because they are two separate
+            things: a pause that expires by itself, and an off that does not.
+            Collapsing them into one would leave the operator unsure which
+            they had pressed, which matters most in the case where they
+            believe sound will come back and it will not. */}
+        {onPauseAudio && (
+          <button
+            type="button"
+            className={audioPaused ? 'status-pill status-action status-audio paused' : 'status-pill status-action status-audio'}
+            onClick={onPauseAudio}
+            disabled={!audioEnabled}
+            title={audioEnabled
+              ? 'Silence alarm audio briefly; it returns by itself'
+              : 'Alarm audio is off, so there is nothing to pause'}
+            aria-label={audioPaused
+              ? `Alarm audio paused, ${pauseRemaining} seconds remaining`
+              : 'Pause alarm audio'}
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 9h4l5-4v14l-5-4H4z" strokeLinejoin="round" />
+            </svg>
+            {audioPaused ? `${pauseRemaining}s` : 'Pause'}
+          </button>
+        )}
+        {onAudioEnabledChange && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(audioEnabled)}
+            className={audioEnabled ? 'status-pill status-action status-mute' : 'status-pill status-mute is-off'}
+            onClick={() => onAudioEnabledChange(!audioEnabled)}
+            title={audioEnabled ? 'Turn alarm audio off' : 'Turn alarm audio on'}
+            aria-label={audioEnabled ? 'Alarm audio on. Turn off' : 'Alarm audio off. Turn on'}
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 9h4l5-4v14l-5-4H4z" strokeLinejoin="round" />
+              {audioEnabled
+                ? <path d="M16.5 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
+                : <path d="M17 9.5l4 5M21 9.5l-4 5" strokeLinecap="round" />}
+            </svg>
+            {audioEnabled ? 'Audio' : 'Audio off'}
+          </button>
+        )}
         {/* A capture is taken at the moment something on the display is
             worth keeping, which is while the operator is looking at it. The
             page that reviews captures is not the page from which one is
@@ -129,10 +173,19 @@ export default function StatusBar({
             type="button"
             className={flushActive ? 'status-pill status-o2 active' : 'status-pill status-o2'}
             onClick={onOxygenFlush}
+            aria-pressed={Boolean(flushActive)}
+            title={flushActive
+              ? 'End 100 % oxygen now and return to the set value'
+              : 'Deliver 100 % oxygen for two minutes'}
             aria-label={flushActive
-              ? `100 percent oxygen, ${flushRemaining} seconds remaining`
+              ? `100 percent oxygen, ${flushRemaining} seconds remaining. Press to end now`
               : 'Deliver 100 percent oxygen for two minutes'}
           >
+            {flushActive && (
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            )}
             O₂ {flushActive ? `${flushRemaining}s` : '100%'}
           </button>
         )}

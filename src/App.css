@@ -1922,3 +1922,18 @@
 /* The hold result sits above the shell body so it is read where the trace
    that produced it is, rather than on another page. */
 .device-shell > .maneuver-result { margin: 0; }
+
+/* ---------- Alarm audio ---------- */
+.status-audio.paused { color: var(--warn); border-color: rgba(255,190,90,0.45); background: rgba(255,190,90,0.12); }
+.status-audio:disabled { opacity: 0.4; cursor: not-allowed; }
+.status-mute { cursor: pointer; }
+/* Audio off is a state the operator has to be able to see at a glance from
+   across the bed space, so it is marked, not merely un-highlighted. */
+.status-mute.is-off {
+  color: var(--danger); border-color: rgba(255,95,109,0.5); background: rgba(255,95,109,0.14);
+  font-weight: 700;
+}
+.status-mute.is-off::after {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--danger);
+  animation: pulse 2s ease-in-out infinite;
+}

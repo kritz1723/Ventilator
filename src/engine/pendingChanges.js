@@ -17,6 +17,7 @@ export const CONFIRMABLE = {
   STOP: 'stop',
   MODE: 'mode',
   CATEGORY: 'category',
+  AUDIO_OFF: 'audioOff',
 }
 
 export const CONFIRMATION_COPY = {
@@ -39,6 +40,14 @@ export const CONFIRMATION_COPY = {
     title: 'Change patient category?',
     body: 'Setting ranges change, and settings outside the new range are clamped into it.',
     accept: 'Change category',
+  },
+  // Disabling audio removes one of the two ways an alarm reaches the
+  // operator, and unlike the pause it does not come back on its own. The
+  // confirmation says what remains rather than only what is being lost.
+  [CONFIRMABLE.AUDIO_OFF]: {
+    title: 'Turn alarm audio off?',
+    body: 'Alarms will annunciate visually only, with no sound, until audio is turned back on. This does not expire. An indicator stays on the status bar for as long as audio is off.',
+    accept: 'Turn audio off',
   },
 }
 

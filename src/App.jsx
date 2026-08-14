@@ -59,6 +59,8 @@ import {
   loadConfig, saveConfig, loadEvents, saveEvents, clearStored, CLEARABLE,
 } from './state/persistence.js'
 import { CONFIG_DEFAULTS } from './state/configDefaults.js'
+import { useAlarmAudio } from './state/useAlarmAudio.js'
+import { AUDIO_STATE, pauseSurvives, requiresConfirmation } from './engine/alarmTones.js'
 
 const SCREEN = {
   POWER_ON: 'power-on',
@@ -82,6 +84,7 @@ export default function App() {
   const [testStatus, setTestStatus] = useState({})
   const [infoOpen, setInfoOpen] = useState(false)
   const [audioPausedUntil, setAudioPausedUntil] = useState(0)
+  const [audioEnabled, setAudioEnabled] = useState(stored.audioEnabled)
   const [frozen, setFrozen] = useState(false)
   const [frozenWaveform, setFrozenWaveform] = useState(null)
   const [cursors, setCursors] = useState([null, null])
@@ -154,6 +157,13 @@ export default function App() {
 
   const numerics = { ...rawNumerics, spo2, fio2: deliveredFio2 }
 
+  const audio = useAlarmAudio({
+    enabled: audioEnabled,
+    pausedUntil: audioPausedUntil,
+    alarms,
+    now,
+  })
+
   const log = useCallback((entry) => {
     setEvents((prev) => appendEvent(prev, createEvent(entry)))
   }, [])
@@ -174,10 +184,22 @@ export default function App() {
 
   const prevAlarmsRef = useRef([])
   useEffect(() => {
-    const entries = diffAlarms(prevAlarmsRef.current, alarms)
+    const previous = prevAlarmsRef.current
+    const entries = diffAlarms(previous, alarms)
     prevAlarmsRef.current = alarms
     logMany(entries)
-  }, [alarms, logMany])
+
+    // An audio pause silences what was alarming when it was pressed. An alarm
+    // of higher priority arriving afterwards was never silenced by anyone, so
+    // the pause ends and it is heard.
+    if (audioPausedUntil > Date.now() && !pauseSurvives(previous, alarms)) {
+      setAudioPausedUntil(0)
+      log({
+        category: EVENT_CATEGORY.ALARM,
+        message: 'Alarm audio pause ended early — higher priority alarm',
+      })
+    }
+  }, [alarms, logMany, audioPausedUntil, log])
 
   useEffect(() => {
     const resolved = resolveActiveMode(licence, MODES, settings.mode, DEFAULT_MODE)
@@ -204,11 +226,11 @@ export default function App() {
   useEffect(() => {
     const result = saveConfig({
       settings, patientData, patientKey, theme, selectedMeasurements,
-      layout, licence, units, language, workspace, displayScale,
+      layout, licence, units, language, workspace, displayScale, audioEnabled,
     })
     setStorageError(result.ok ? null : result.reason)
   }, [settings, patientData, patientKey, theme, selectedMeasurements,
-    layout, licence, units, language, workspace, displayScale])
+    layout, licence, units, language, workspace, displayScale, audioEnabled])
 
   // The log is written separately because it is the part that grows, and
   // because a quota failure on the log must not take the configuration with
@@ -235,6 +257,7 @@ export default function App() {
       setLanguage(CONFIG_DEFAULTS.language)
       setWorkspace(CONFIG_DEFAULTS.workspace)
       setDisplayScale(CONFIG_DEFAULTS.displayScale)
+      setAudioEnabled(CONFIG_DEFAULTS.audioEnabled)
     }
     if (what === CLEARABLE.LOG || what === CLEARABLE.ALL) {
       setEvents([])
@@ -300,6 +323,23 @@ export default function App() {
   }, [ventilating, settings.mode])
 
 
+  const setAudio = useCallback((next) => {
+    setAudioEnabled(next)
+    if (next) setAudioPausedUntil(0)
+    log({
+      category: EVENT_CATEGORY.ALARM,
+      message: next ? 'Alarm audio enabled' : 'Alarm audio disabled',
+      detail: next ? null : 'Alarms continue to annunciate visually',
+    })
+  }, [log])
+
+  const requestAudioChange = useCallback((next) => {
+    // Guarding only the direction that removes a safeguard; confirming the
+    // safe direction as well would teach the operator to dismiss the guard.
+    if (requiresConfirmation(next)) setConfirm({ action: CONFIRMABLE.AUDIO_OFF })
+    else setAudio(true)
+  }, [setAudio])
+
   // Pre-oxygenation is offered in more than one place, so the action itself
   // lives here rather than in whichever control happened to be pressed.
   const startOxygenFlush = useCallback(() => {
@@ -311,6 +351,26 @@ export default function App() {
       detail: `Set FiO₂ remains ${settings.fio2} %`,
     })
   }, [flush, settings.fio2, log])
+
+  const endOxygenFlush = useCallback(() => {
+    if (!isFlushActive(flush, Date.now())) return
+    const left = flushRemaining(flush, Date.now())
+    setFlush(null)
+    log({
+      category: EVENT_CATEGORY.SETTING,
+      message: '100 % oxygen ended early',
+      detail: `${left}s of the ${FLUSH_DURATION_SECONDS}s period remained`,
+    })
+  }, [flush, log])
+
+  // One control that starts and ends it. The operator who begins
+  // pre-oxygenation is the one who decides it is no longer needed, and
+  // sending them to another page to say so is how an override gets left
+  // running past the point anybody wanted it.
+  const toggleOxygenFlush = useCallback(() => {
+    if (isFlushActive(flush, Date.now())) endOxygenFlush()
+    else startOxygenFlush()
+  }, [flush, startOxygenFlush, endOxygenFlush])
 
   // Simulation inputs apply immediately, ventilating or not: they are not
   // delivered to anyone, so there is nothing to acknowledge, and staging them
@@ -419,8 +479,10 @@ export default function App() {
       log({ category: EVENT_CATEGORY.STATE, message: 'Ventilation stopped — standby' })
     } else if (action === CONFIRMABLE.START) {
       payload()
+    } else if (action === CONFIRMABLE.AUDIO_OFF) {
+      setAudio(false)
     }
-  }, [confirm, log])
+  }, [confirm, log, setAudio])
 
   const startVentilation = useCallback(() => {
     reset()
@@ -608,7 +670,19 @@ export default function App() {
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
             onCapture={isEnabled(licence, 'captures') ? capture : null}
             captureCount={snapshots.length}
-            onOxygenFlush={startOxygenFlush}
+            onOxygenFlush={toggleOxygenFlush}
+            audioEnabled={audioEnabled}
+            audioState={audio.state}
+            audioPaused={audioPaused}
+            pauseRemaining={pauseRemaining}
+            onPauseAudio={() => {
+              setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)
+              log({
+                category: EVENT_CATEGORY.ALARM,
+                message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
+              })
+            }}
+            onAudioEnabledChange={requestAudioChange}
             flushActive={flushActive}
             flushRemaining={flushLeft}
             t={t}
@@ -674,6 +748,7 @@ export default function App() {
                     onReset={() => {
                       setWorkspace(CONFIG_DEFAULTS.workspace)
                       setDisplayScale(CONFIG_DEFAULTS.displayScale)
+      setAudioEnabled(CONFIG_DEFAULTS.audioEnabled)
                     }}
                   />
                   <Workspace
@@ -819,7 +894,19 @@ export default function App() {
                     setupLocked={setupLocked}
                     holdState={holdState}
                     onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
-            onOxygenFlush={startOxygenFlush}
+            onOxygenFlush={toggleOxygenFlush}
+            audioEnabled={audioEnabled}
+            audioState={audio.state}
+            audioPaused={audioPaused}
+            pauseRemaining={pauseRemaining}
+            onPauseAudio={() => {
+              setAudioPausedUntil(Date.now() + AUDIO_PAUSE_SECONDS * 1000)
+              log({
+                category: EVENT_CATEGORY.ALARM,
+                message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
+              })
+            }}
+            onAudioEnabledChange={requestAudioChange}
             flushActive={flushActive}
             flushRemaining={flushLeft}
                   />
