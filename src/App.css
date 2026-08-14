@@ -1397,3 +1397,53 @@
 @media (prefers-reduced-motion: reduce) {
   .lung-body, .diaphragm { transition: none; }
 }
+
+/* ---------- Setup lockout ---------- */
+.setup-locked-tag {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; color: var(--warning);
+  background: rgba(255,190,77,0.12); border: 1px solid rgba(255,190,77,0.35);
+}
+.setup-locked-note { margin: 0; font-size: 10.5px; line-height: 1.4; color: var(--text-muted); }
+.control-panel select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- Screen lock ---------- */
+.lock-overlay {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: end center;
+  padding: 0 0 40px;
+  /* Transparent to the eye, opaque to the finger: the display stays fully
+     readable while contact with the controls is intercepted. */
+  background: rgba(6, 9, 14, 0.18);
+  backdrop-filter: saturate(0.9);
+}
+.lock-card {
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px 20px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 60px -18px rgba(0,0,0,0.9);
+  text-align: center;
+}
+.lock-icon { color: var(--accent); display: inline-flex; }
+.lock-card h2 { margin: 6px 0 6px; font-size: 16px; }
+.lock-card p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+
+.lock-unlock {
+  position: relative; overflow: hidden;
+  width: 100%; margin-top: 14px; padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(76,196,245,0.5);
+  background: rgba(76,196,245,0.1);
+  color: var(--accent); font-size: 13px; font-weight: 650;
+  touch-action: none; user-select: none;
+}
+.lock-progress {
+  position: absolute; inset: 0;
+  transform-origin: left center; transform: scaleX(0);
+  background: rgba(76,196,245,0.28);
+  transition: transform 40ms linear;
+}
+.lock-unlock-label { position: relative; }
+.lock-alarm-note { margin-top: 10px !important; color: var(--warning) !important; }

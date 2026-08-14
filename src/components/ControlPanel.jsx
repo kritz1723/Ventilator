@@ -34,6 +34,7 @@ export default function ControlPanel({
   onManeuver,
   onStopVentilation,
   onAutoset,
+  setupLocked = false,
   t = (k) => k,
 }) {
   const update = (patch) => onSettingsChange({ ...settings, ...patch })
@@ -159,9 +160,18 @@ export default function ControlPanel({
       )}
 
       <section className="panel control-section">
-        <span className="panel-title">{t('panel.simulatedLung')}</span>
+        <div className="section-head">
+          <span className="panel-title">{t('panel.simulatedLung')}</span>
+          {setupLocked && <span className="setup-locked-tag">Locked</span>}
+        </div>
+        {setupLocked && (
+          <p className="setup-locked-note">
+            Patient setup is unavailable while ventilating. Stop ventilation to
+            change it.
+          </p>
+        )}
         <div className="select-wrap">
-          <select value={patientKey} onChange={(e) => onPatientChange(e.target.value)}>
+          <select value={patientKey} disabled={setupLocked} onChange={(e) => onPatientChange(e.target.value)}>
             {Object.entries(PATIENT_PRESETS).map(([key, preset]) => (
               <option key={key} value={key}>{preset.label}</option>
             ))}
@@ -174,7 +184,7 @@ export default function ControlPanel({
         <label className="field field-stacked">
           <span className="field-label">{t('field.spontaneousEffort')}</span>
           <div className="select-wrap">
-            <select value={settings.effort} onChange={(e) => update({ effort: e.target.value })}>
+            <select value={settings.effort} disabled={setupLocked} onChange={(e) => update({ effort: e.target.value })}>
               {Object.values(EFFORT_PRESETS).map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
