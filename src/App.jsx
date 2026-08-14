@@ -24,6 +24,8 @@ import NavRail from './components/NavRail.jsx'
 import NumericRail from './components/NumericRail.jsx'
 import LungHero from './components/LungHero.jsx'
 import SettingTiles from './components/SettingTiles.jsx'
+import SettingsToolbar from './components/SettingsToolbar.jsx'
+import SaveConfirmDialog from './components/SaveConfirmDialog.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -88,8 +90,14 @@ export default function App() {
   const [flush, setFlush] = useState(null)
   const [lockState, setLockState] = useState(LOCK_STATE.UNLOCKED)
   const [page, setPage] = useState('home')
+  // Settings are read-only until the operator opts into editing, so a stray
+  // touch cannot change a value and Save has a definite batch to confirm.
+  const [settingsEditing, setSettingsEditing] = useState(false)
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
   const [now, setNow] = useState(Date.now())
 
+  const settingsEditingRef = useRef(false)
   const t = makeTranslator(language)
   const patient = PATIENT_PRESETS[patientKey]
   const ventilating = screen === SCREEN.VENTILATING
@@ -193,6 +201,13 @@ export default function App() {
   // Mode is a therapy-level change, so it is confirmed rather than staged.
   const changeSettings = useCallback((next) => {
     if (!ventilating) {
+      // In standby, edits made through the settings editor are still staged
+      // so that Save remains the single point of commitment wherever the
+      // operator is; edits from elsewhere apply directly.
+      if (settingsEditingRef.current) {
+        setPendingSettings(next)
+        return
+      }
       setSettings(next)
       return
     }
@@ -202,6 +217,7 @@ export default function App() {
     }
     setPendingSettings(next)
   }, [ventilating, settings.mode])
+
 
   const acceptPending = useCallback(() => {
     if (!pendingSettings) return
@@ -240,6 +256,35 @@ export default function App() {
       detail: autoset.changes.map((c) => `${c.label} ${c.from}→${c.to}`).join(', '),
     })
   }, [autoset, settings, changeSettings, log])
+
+  const draftChanges = pendingDiff(settings, pendingSettings)
+
+  const beginEdit = useCallback(() => {
+    settingsEditingRef.current = true
+    setSettingsEditing(true)
+    setSavedAt(null)
+  }, [])
+
+  const discardEdit = useCallback(() => {
+    settingsEditingRef.current = false
+    setSettingsEditing(false)
+    setSaveConfirmOpen(false)
+    cancelPending()
+  }, [cancelPending])
+
+  const commitSave = useCallback(() => {
+    const count = draftChanges.length
+    acceptPending()
+    setSaveConfirmOpen(false)
+    settingsEditingRef.current = false
+    setSettingsEditing(false)
+    setSavedAt(new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    log({
+      category: EVENT_CATEGORY.SETTING,
+      message: `${count} setting${count === 1 ? '' : 's'} saved`,
+      detail: draftChanges.map((c) => `${c.key} ${c.from}→${c.to}`).join(', '),
+    })
+  }, [draftChanges, acceptPending, log])
 
   const capture = useCallback(() => {
     const snap = createSnapshot({ numerics, measurements, settings, patient })
@@ -588,7 +633,17 @@ export default function App() {
 
               {page === 'settings' && (
                 <div className="page-settings">
+                  <SettingsToolbar
+                    editing={settingsEditing}
+                    changeCount={draftChanges.length}
+                    ventilating={ventilating}
+                    savedAt={savedAt}
+                    onEdit={beginEdit}
+                    onDiscard={discardEdit}
+                    onSave={() => setSaveConfirmOpen(true)}
+                  />
                   <ControlPanel
+                    readOnly={!settingsEditing}
                     settings={editedSettings}
                     availableModes={availableModes}
                     features={{
@@ -637,6 +692,13 @@ export default function App() {
         </main>
       )}
 
+      <SaveConfirmDialog
+        open={saveConfirmOpen}
+        changes={draftChanges}
+        ventilating={ventilating}
+        onConfirm={commitSave}
+        onBack={() => setSaveConfirmOpen(false)}
+      />
       <ScreenLockOverlay
         locked={screenLocked}
         alarmActive={alarms.length > 0}

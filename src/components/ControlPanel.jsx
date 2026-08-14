@@ -5,20 +5,24 @@ import { FLOW_PATTERNS } from '../engine/flowPatterns.js'
 import { rangeFor, COMMON_RANGES } from '../engine/patientCategories.js'
 import { HOLD_LIMITS } from '../engine/maneuvers.js'
 
-function NumberField({ label, unit, value, onChange, min, max, step }) {
+function NumberField({ label, unit, value, onChange, min, max, step, readOnly = false }) {
   const clamp = (v) => Math.min(Math.max(v, min), max)
   return (
-    <div className="field">
+    <div className={readOnly ? 'field field-readonly' : 'field'}>
       <span className="field-label">{label}</span>
       <div className="stepper">
-        <button type="button" className="stepper-btn" aria-label={`Decrease ${label}`}
-          onClick={() => onChange(Number(clamp(value - step).toFixed(2)))}>−</button>
+        {!readOnly && (
+          <button type="button" className="stepper-btn" aria-label={`Decrease ${label}`}
+            onClick={() => onChange(Number(clamp(value - step).toFixed(2)))}>−</button>
+        )}
         <span className="stepper-readout">
           <span className="stepper-value tnum">{value}</span>
           <span className="stepper-unit">{unit}</span>
         </span>
-        <button type="button" className="stepper-btn" aria-label={`Increase ${label}`}
-          onClick={() => onChange(Number(clamp(value + step).toFixed(2)))}>+</button>
+        {!readOnly && (
+          <button type="button" className="stepper-btn" aria-label={`Increase ${label}`}
+            onClick={() => onChange(Number(clamp(value + step).toFixed(2)))}>+</button>
+        )}
       </div>
     </div>
   )
@@ -37,6 +41,7 @@ export default function ControlPanel({
   onAutoset,
   holdState = {},
   setupLocked = false,
+  readOnly = false,
   t = (k) => k,
 }) {
   const update = (patch) => onSettingsChange({ ...settings, ...patch })
@@ -57,6 +62,7 @@ export default function ControlPanel({
               key={m.id}
               type="button"
               className={m.id === settings.mode ? 'mode-item active' : 'mode-item'}
+              disabled={readOnly}
               onClick={() => update({ mode: m.id })}
             >
               <span className="mode-code">{m.label}</span>
@@ -68,36 +74,36 @@ export default function ControlPanel({
 
       <section className="panel control-section">
         <span className="panel-title">{t('panel.settings')}</span>
-        <NumberField label={t('field.rate')} unit="/min" value={settings.respRate}
+        <NumberField readOnly={readOnly} label={t('field.rate')} unit="/min" value={settings.respRate}
           min={rrRange.min} max={rrRange.max} step={rrRange.step}
           onChange={(v) => update({ respRate: v })} />
 
         {mode.primaryControl === 'tidalVolume' ? (
-          <NumberField label={t('field.tidalVolume')} unit="mL" value={settings.tidalVolume}
+          <NumberField readOnly={readOnly} label={t('field.tidalVolume')} unit="mL" value={settings.tidalVolume}
             min={vtRange.min} max={vtRange.max} step={vtRange.step}
             onChange={(v) => update({ tidalVolume: v })} />
         ) : (
-          <NumberField label={t('field.inspPressure')} unit="cmH₂O" value={settings.pInsp}
+          <NumberField readOnly={readOnly} label={t('field.inspPressure')} unit="cmH₂O" value={settings.pInsp}
             min={piRange.min} max={piRange.max} step={piRange.step}
             onChange={(v) => update({ pInsp: v })} />
         )}
 
-        <NumberField label="PEEP" unit="cmH₂O" value={settings.peep}
+        <NumberField readOnly={readOnly} label="PEEP" unit="cmH₂O" value={settings.peep}
           min={peepRange.min} max={peepRange.max} step={peepRange.step}
           onChange={(v) => update({ peep: v })} />
-        <NumberField label="FiO₂" unit="%" value={settings.fio2}
+        <NumberField readOnly={readOnly} label="FiO₂" unit="%" value={settings.fio2}
           min={COMMON_RANGES.fio2.min} max={COMMON_RANGES.fio2.max} step={COMMON_RANGES.fio2.step}
           onChange={(v) => update({ fio2: v })} />
-        <NumberField label={t('field.inspPause')} unit="s" value={settings.pauseTime} min={0} max={1} step={0.1}
+        <NumberField readOnly={readOnly} label={t('field.inspPause')} unit="s" value={settings.pauseTime} min={0} max={1} step={0.1}
           onChange={(v) => update({ pauseTime: v })} />
-        <NumberField label={t('field.trigger')} unit="L/min" value={settings.triggerFlow} min={0.5} max={15} step={0.5}
+        <NumberField readOnly={readOnly} label={t('field.trigger')} unit="L/min" value={settings.triggerFlow} min={0.5} max={15} step={0.5}
           onChange={(v) => update({ triggerFlow: v })} />
         {mode.supportsPressureSupport && (
-          <NumberField label={t('field.pSupport')} unit="cmH₂O" value={settings.pSupport} min={0} max={40} step={1}
+          <NumberField readOnly={readOnly} label={t('field.pSupport')} unit="cmH₂O" value={settings.pSupport} min={0} max={40} step={1}
             onChange={(v) => update({ pSupport: v })} />
         )}
         {mode.supportsCycleOff && (
-          <NumberField label={t('field.cycleOff')} unit="%" value={settings.cycleOffPercent} min={5} max={70} step={5}
+          <NumberField readOnly={readOnly} label={t('field.cycleOff')} unit="%" value={settings.cycleOffPercent} min={5} max={70} step={5}
             onChange={(v) => update({ cycleOffPercent: v })} />
         )}
       </section>
@@ -112,6 +118,7 @@ export default function ControlPanel({
                 type="button"
                 title={p.description}
                 className={p.id === settings.flowPattern ? 'pattern-btn active' : 'pattern-btn'}
+                disabled={readOnly}
                 onClick={() => update({ flowPattern: p.id })}
               >
                 <PatternGlyph id={p.id} />
@@ -125,28 +132,28 @@ export default function ControlPanel({
       <section className="panel control-section">
         <div className="section-head">
           <span className="panel-title">{t('panel.alarmLimits')}</span>
-          {onAutoset && (
+          {onAutoset && !readOnly && (
             <button type="button" className="btn btn-ghost btn-tiny" onClick={onAutoset}>
               Autoset
             </button>
           )}
         </div>
-        <NumberField label="P high" unit="cmH₂O" value={settings.alarmLimits.highPressure}
+        <NumberField readOnly={readOnly} label="P high" unit="cmH₂O" value={settings.alarmLimits.highPressure}
           min={10} max={80} step={1}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highPressure: v } })} />
-        <NumberField label="P low" unit="cmH₂O" value={settings.alarmLimits.lowPressure}
+        <NumberField readOnly={readOnly} label="P low" unit="cmH₂O" value={settings.alarmLimits.lowPressure}
           min={0} max={20} step={1}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowPressure: v } })} />
-        <NumberField label="MV high" unit="L/min" value={settings.alarmLimits.highMinuteVolume}
+        <NumberField readOnly={readOnly} label="MV high" unit="L/min" value={settings.alarmLimits.highMinuteVolume}
           min={2} max={40} step={0.5}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highMinuteVolume: v } })} />
-        <NumberField label="MV low" unit="L/min" value={settings.alarmLimits.lowMinuteVolume}
+        <NumberField readOnly={readOnly} label="MV low" unit="L/min" value={settings.alarmLimits.lowMinuteVolume}
           min={0} max={20} step={0.5}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowMinuteVolume: v } })} />
-        <NumberField label="Vt low" unit="mL" value={settings.alarmLimits.lowTidalVolume}
+        <NumberField readOnly={readOnly} label="Vt low" unit="mL" value={settings.alarmLimits.lowTidalVolume}
           min={0} max={1000} step={10}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, lowTidalVolume: v } })} />
-        <NumberField label="Rate high" unit="/min" value={settings.alarmLimits.highRespRate}
+        <NumberField readOnly={readOnly} label="Rate high" unit="/min" value={settings.alarmLimits.highRespRate}
           min={5} max={150} step={1}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highRespRate: v } })} />
       </section>
@@ -199,7 +206,7 @@ export default function ControlPanel({
           </p>
         )}
         <div className="select-wrap">
-          <select value={patientKey} disabled={setupLocked} onChange={(e) => onPatientChange(e.target.value)}>
+          <select value={patientKey} disabled={setupLocked || readOnly} onChange={(e) => onPatientChange(e.target.value)}>
             {Object.entries(PATIENT_PRESETS).map(([key, preset]) => (
               <option key={key} value={key}>{preset.label}</option>
             ))}
@@ -212,7 +219,7 @@ export default function ControlPanel({
         <label className="field field-stacked">
           <span className="field-label">{t('field.spontaneousEffort')}</span>
           <div className="select-wrap">
-            <select value={settings.effort} disabled={setupLocked} onChange={(e) => update({ effort: e.target.value })}>
+            <select value={settings.effort} disabled={setupLocked || readOnly} onChange={(e) => update({ effort: e.target.value })}>
               {Object.values(EFFORT_PRESETS).map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
