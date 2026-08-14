@@ -16,6 +16,7 @@ import EventLogDrawer from './components/EventLogDrawer.jsx'
 import ConfirmDialog from './components/ConfirmDialog.jsx'
 import AdminScreen from './components/AdminScreen.jsx'
 import PendingChangesBar from './components/PendingChangesBar.jsx'
+import AutosetProposal from './components/AutosetProposal.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -35,6 +36,7 @@ import {
   CONFIRMABLE, pendingDiff, clampToRanges,
 } from './engine/pendingChanges.js'
 import { createSnapshot, addSnapshot } from './engine/snapshots.js'
+import { proposeLimits } from './engine/autoThresholds.js'
 import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
 } from './engine/eventLog.js'
@@ -71,6 +73,7 @@ export default function App() {
   // delivered, so there is nothing to guard.
   const [pendingSettings, setPendingSettings] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const [autoset, setAutoset] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   const t = makeTranslator(language)
@@ -190,6 +193,26 @@ export default function App() {
       })
     }
   }, [settings, pendingSettings, log])
+
+  // Autoset derives limits from the present measurements and offers them
+  // for review; nothing is applied until the operator accepts.
+  const requestAutoset = useCallback(() => {
+    setAutoset(proposeLimits(numerics, settings.alarmLimits))
+  }, [numerics, settings.alarmLimits])
+
+  const acceptAutoset = useCallback(() => {
+    if (!autoset) return
+    const next = { ...settings, alarmLimits: { ...settings.alarmLimits, ...autoset.derived } }
+    setAutoset(null)
+    // Route through the normal change path so the acknowledgement and the
+    // event record apply exactly as they would to a manual edit.
+    changeSettings(next)
+    log({
+      category: EVENT_CATEGORY.SETTING,
+      message: `Alarm limits autoset from measurements (${autoset.changes.length} changed)`,
+      detail: autoset.changes.map((c) => `${c.label} ${c.from}→${c.to}`).join(', '),
+    })
+  }, [autoset, settings, changeSettings, log])
 
   const capture = useCallback(() => {
     const snap = createSnapshot({ numerics, measurements, settings, patient })
@@ -392,6 +415,7 @@ export default function App() {
               })
             }}
             t={t}
+            onAutoset={requestAutoset}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">
@@ -406,6 +430,11 @@ export default function App() {
                   message: `Alarm audio paused for ${AUDIO_PAUSE_SECONDS}s`,
                 })
               }}
+            />
+            <AutosetProposal
+              proposal={autoset}
+              onAccept={acceptAutoset}
+              onCancel={() => setAutoset(null)}
             />
             <PendingChangesBar
               changes={pendingDiff(settings, pendingSettings)}

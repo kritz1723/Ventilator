@@ -33,6 +33,7 @@ export default function ControlPanel({
   patientCategory,
   onManeuver,
   onStopVentilation,
+  onAutoset,
   t = (k) => k,
 }) {
   const update = (patch) => onSettingsChange({ ...settings, ...patch })
@@ -119,7 +120,14 @@ export default function ControlPanel({
       )}
 
       <section className="panel control-section">
-        <span className="panel-title">{t('panel.alarmLimits')}</span>
+        <div className="section-head">
+          <span className="panel-title">{t('panel.alarmLimits')}</span>
+          {onAutoset && (
+            <button type="button" className="btn btn-ghost btn-tiny" onClick={onAutoset}>
+              Autoset
+            </button>
+          )}
+        </div>
         <NumberField label="P high" unit="cmH₂O" value={settings.alarmLimits.highPressure}
           min={10} max={80} step={1}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highPressure: v } })} />
