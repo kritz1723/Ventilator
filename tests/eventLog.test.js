@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   createEvent, appendEvent, diffSettings, diffAlarms, filterEvents,
-  EVENT_CATEGORY, ACTION_CATEGORIES, MAX_EVENTS, toCsv,
+  EVENT_CATEGORY, ACTION_CATEGORIES, MAX_EVENTS, MAX_ALARM_EVENTS, MAX_OTHER_EVENTS,
+  logCapacity, seedSequence, toCsv,
 } from '../src/engine/eventLog.js'
 
 const settings = {
@@ -96,13 +97,61 @@ describe('filterEvents', () => {
 })
 
 describe('log storage', () => {
-  it('puts the newest event first and bounds the length', () => {
+  it('puts the newest event first and bounds non-alarm events', () => {
     let log = []
-    for (let i = 0; i < MAX_EVENTS + 10; i += 1) {
+    for (let i = 0; i < MAX_OTHER_EVENTS + 10; i += 1) {
       log = appendEvent(log, createEvent({ category: EVENT_CATEGORY.STATE, message: `e${i}` }))
     }
-    expect(log).toHaveLength(MAX_EVENTS)
-    expect(log[0].message).toBe(`e${MAX_EVENTS + 9}`)
+    expect(log).toHaveLength(MAX_OTHER_EVENTS)
+    expect(log[0].message).toBe(`e${MAX_OTHER_EVENTS + 9}`)
+  })
+
+  it('bounds alarms separately from everything else', () => {
+    let log = []
+    for (let i = 0; i < MAX_ALARM_EVENTS + 50; i += 1) {
+      log = appendEvent(log, createEvent({ category: EVENT_CATEGORY.ALARM, message: `a${i}` }))
+    }
+    expect(log).toHaveLength(MAX_ALARM_EVENTS)
+    expect(log[0].message).toBe(`a${MAX_ALARM_EVENTS + 49}`)
+  })
+
+  // The point of splitting the retention: a busy stretch of operator activity
+  // must not evict the alarms, which are the part worth reconstructing.
+  it('does not let operator actions evict alarms', () => {
+    let log = []
+    for (let i = 0; i < 20; i += 1) {
+      log = appendEvent(log, createEvent({ category: EVENT_CATEGORY.ALARM, message: `a${i}` }))
+    }
+    for (let i = 0; i < MAX_OTHER_EVENTS + 200; i += 1) {
+      log = appendEvent(log, createEvent({ category: EVENT_CATEGORY.SETTING, message: `s${i}` }))
+    }
+    const alarms = log.filter((e) => e.category === EVENT_CATEGORY.ALARM)
+    expect(alarms).toHaveLength(20)
+    expect(alarms[alarms.length - 1].message).toBe('a0')
+  })
+
+  it('reports how full each class is', () => {
+    const log = [
+      createEvent({ category: EVENT_CATEGORY.ALARM, message: 'a' }),
+      createEvent({ category: EVENT_CATEGORY.SETTING, message: 's' }),
+      createEvent({ category: EVENT_CATEGORY.SETTING, message: 's2' }),
+    ]
+    expect(logCapacity(log)).toEqual({
+      alarms: 1, alarmLimit: MAX_ALARM_EVENTS, others: 2, otherLimit: MAX_OTHER_EVENTS,
+    })
+  })
+
+  // Restored entries carry sequence numbers from before the reload; reusing
+  // them would show two different events as the same entry.
+  it('continues sequence numbering across a restored log', () => {
+    seedSequence([{ seq: 4200 }, { seq: 17 }])
+    expect(createEvent({ category: EVENT_CATEGORY.STATE, message: 'after reload' }).seq).toBe(4201)
+  })
+
+  it('ignores a restored log with no usable sequence numbers', () => {
+    const before = createEvent({ category: EVENT_CATEGORY.STATE, message: 'x' }).seq
+    seedSequence([{ seq: undefined }, {}])
+    expect(createEvent({ category: EVENT_CATEGORY.STATE, message: 'y' }).seq).toBe(before + 1)
   })
 
   it('exports CSV with quoted fields', () => {

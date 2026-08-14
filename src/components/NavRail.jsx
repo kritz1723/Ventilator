@@ -52,13 +52,22 @@ export default function NavRail({ page, onPageChange, alarmCount, onLock }) {
           type="button"
           className={page === item.id ? 'nav-item active' : 'nav-item'}
           aria-current={page === item.id ? 'page' : undefined}
+          // Naming the button outright avoids the count being read ahead of
+          // the destination, which is what the badge's position in the markup
+          // would otherwise produce.
+          aria-label={item.badge
+            ? `${item.label}, ${item.badge === 1 ? '1 active alarm' : `${item.badge} active alarms`}`
+            : undefined}
           onClick={() => onPageChange(item.id)}
         >
           <span className="nav-icon">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
               {ICONS[item.id]}
             </svg>
-            {item.badge ? <span className="nav-badge">{item.badge}</span> : null}
+            {/* The count is decoration over the icon; announcing it as part
+                of the button's name gives "1 Alarms", which reads as a label
+                nobody wrote. The label carries the count in words instead. */}
+            {item.badge ? <span className="nav-badge" aria-hidden="true">{item.badge}</span> : null}
           </span>
           <span className="nav-label">{item.label}</span>
         </button>

@@ -39,7 +39,15 @@ export const ACTION_CATEGORIES = [
   EVENT_CATEGORY.STATE,
 ]
 
-export const MAX_EVENTS = 500
+// Retention is per class rather than a single ceiling on the whole log.
+//
+// A shared cap lets one class evict the other: a noisy afternoon of setting
+// adjustments would push the morning's alarms out of the record, and the
+// alarms are the part that matters when reconstructing what happened. Alarms
+// and operator actions therefore age out independently of each other.
+export const MAX_ALARM_EVENTS = 200
+export const MAX_OTHER_EVENTS = 1000
+export const MAX_EVENTS = MAX_ALARM_EVENTS + MAX_OTHER_EVENTS
 
 let sequence = 0
 
@@ -55,8 +63,44 @@ export function createEvent({ category, severity = null, message, detail = null,
   }
 }
 
+// Restored events carry sequence numbers issued before the reload. Continuing
+// from the highest of them keeps the numbering monotonic across a session
+// boundary, so the log cannot show two different events as the same entry.
+export function seedSequence(events) {
+  const highest = events.reduce((max, e) => Math.max(max, Number(e.seq) || 0), 0)
+  sequence = Math.max(sequence, highest)
+  return sequence
+}
+
+// Trims each class to its own limit while leaving the log in one
+// newest-first list, so the reader sees a single chronology.
+export function trimLog(log) {
+  let alarms = 0
+  let others = 0
+  return log.filter((e) => {
+    if (e.category === EVENT_CATEGORY.ALARM) {
+      alarms += 1
+      return alarms <= MAX_ALARM_EVENTS
+    }
+    others += 1
+    return others <= MAX_OTHER_EVENTS
+  })
+}
+
 export function appendEvent(log, event) {
-  return [event, ...log].slice(0, MAX_EVENTS)
+  return trimLog([event, ...log])
+}
+
+// How full each class is, so the operator can see that the record is bounded
+// rather than discovering that the oldest entries have quietly gone.
+export function logCapacity(log) {
+  const alarms = log.filter((e) => e.category === EVENT_CATEGORY.ALARM).length
+  return {
+    alarms,
+    alarmLimit: MAX_ALARM_EVENTS,
+    others: log.length - alarms,
+    otherLimit: MAX_OTHER_EVENTS,
+  }
 }
 
 // Compares two settings objects and produces one event per changed field,

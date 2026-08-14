@@ -52,8 +52,11 @@ import {
 } from './engine/oxygenation.js'
 import { LOCK_STATE, isSetupLocked } from './engine/screenLock.js'
 import {
-  createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
+  createEvent, appendEvent, diffSettings, diffAlarms, seedSequence, EVENT_CATEGORY,
 } from './engine/eventLog.js'
+import {
+  loadConfig, saveConfig, loadEvents, saveEvents, clearStored, CLEARABLE,
+} from './state/persistence.js'
 
 const SCREEN = {
   POWER_ON: 'power-on',
@@ -62,13 +65,33 @@ const SCREEN = {
   ADMIN: 'admin',
 }
 
+// The configuration that survives a reload, with the values it falls back to
+// when nothing has been stored. Running state is deliberately absent: a
+// reload always comes up in power-on and standby with nothing delivered.
+const CONFIG_DEFAULTS = {
+  settings: DEFAULT_SETTINGS,
+  patientData: DEFAULT_PATIENT_DATA,
+  patientKey: DEFAULT_PATIENT_PRESET,
+  theme: DEFAULT_THEME,
+  selectedMeasurements: DEFAULT_SELECTED_MEASUREMENTS,
+  layout: DEFAULT_LAYOUT,
+  licence: DEFAULT_LICENCE,
+  units: DEFAULT_UNITS,
+  language: DEFAULT_LANGUAGE,
+}
+
 export default function App() {
+  // Read once, at mount. Re-reading later would let a second tab's writes
+  // arrive underneath the operator mid-session.
+  const [restored] = useState(() => loadConfig(CONFIG_DEFAULTS))
+  const stored = restored.config
+
   const [screen, setScreen] = useState(SCREEN.POWER_ON)
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const [patientData, setPatientData] = useState(DEFAULT_PATIENT_DATA)
-  const [patientKey, setPatientKey] = useState(DEFAULT_PATIENT_PRESET)
-  const [theme, setTheme] = useState(DEFAULT_THEME)
-  const [selectedMeasurements, setSelectedMeasurements] = useState(DEFAULT_SELECTED_MEASUREMENTS)
+  const [settings, setSettings] = useState(stored.settings)
+  const [patientData, setPatientData] = useState(stored.patientData)
+  const [patientKey, setPatientKey] = useState(stored.patientKey)
+  const [theme, setTheme] = useState(stored.theme)
+  const [selectedMeasurements, setSelectedMeasurements] = useState(stored.selectedMeasurements)
   const [testStatus, setTestStatus] = useState({})
   const [infoOpen, setInfoOpen] = useState(false)
   const [audioPausedUntil, setAudioPausedUntil] = useState(0)
@@ -76,12 +99,18 @@ export default function App() {
   const [frozenWaveform, setFrozenWaveform] = useState(null)
   const [cursors, setCursors] = useState([null, null])
   const [snapshots, setSnapshots] = useState([])
-  const [events, setEvents] = useState([])
+  // The log is restored with its sequence numbering continued, so entries
+  // written after a reload cannot collide with entries written before it.
+  const [events, setEvents] = useState(() => {
+    const previous = loadEvents()
+    seedSequence(previous)
+    return previous
+  })
   const [logOpen, setLogOpen] = useState(false)
-  const [layout, setLayout] = useState(DEFAULT_LAYOUT)
-  const [licence, setLicence] = useState(DEFAULT_LICENCE)
-  const [units, setUnits] = useState(DEFAULT_UNITS)
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE)
+  const [layout, setLayout] = useState(stored.layout)
+  const [licence, setLicence] = useState(stored.licence)
+  const [units, setUnits] = useState(stored.units)
+  const [language, setLanguage] = useState(stored.language)
   // While ventilating, edits go to a pending copy and reach the patient only
   // when accepted. In standby they apply directly — nothing is being
   // delivered, so there is nothing to guard.
@@ -97,6 +126,7 @@ export default function App() {
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [storageError, setStorageError] = useState(null)
   const [now, setNow] = useState(Date.now())
 
   const settingsEditingRef = useRef(false)
@@ -172,6 +202,57 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
+  // Configuration is written back whenever it changes. It is small and
+  // changes at operator speed, so writing on change costs less than any
+  // scheme for deciding when to write, and never leaves a change unsaved.
+  useEffect(() => {
+    const result = saveConfig({
+      settings, patientData, patientKey, theme, selectedMeasurements,
+      layout, licence, units, language,
+    })
+    setStorageError(result.ok ? null : result.reason)
+  }, [settings, patientData, patientKey, theme, selectedMeasurements,
+    layout, licence, units, language])
+
+  // The log is written separately because it is the part that grows, and
+  // because a quota failure on the log must not take the configuration with
+  // it.
+  useEffect(() => {
+    const result = saveEvents(events)
+    if (!result.ok) setStorageError(result.reason)
+  }, [events])
+
+  // Clearing configuration also returns the live values to their defaults.
+  // Removing the stored copy alone would achieve nothing: the next change
+  // would write the unchanged in-memory configuration straight back.
+  const clearStorage = useCallback((what) => {
+    clearStored(what)
+    if (what === CLEARABLE.CONFIG || what === CLEARABLE.ALL) {
+      setSettings(CONFIG_DEFAULTS.settings)
+      setPatientData(CONFIG_DEFAULTS.patientData)
+      setPatientKey(CONFIG_DEFAULTS.patientKey)
+      setTheme(CONFIG_DEFAULTS.theme)
+      setSelectedMeasurements(CONFIG_DEFAULTS.selectedMeasurements)
+      setLayout(CONFIG_DEFAULTS.layout)
+      setLicence(CONFIG_DEFAULTS.licence)
+      setUnits(CONFIG_DEFAULTS.units)
+      setLanguage(CONFIG_DEFAULTS.language)
+    }
+    if (what === CLEARABLE.LOG || what === CLEARABLE.ALL) {
+      setEvents([])
+    }
+    // Recorded after the clear so the entry survives it, and so the record
+    // shows that data was discarded rather than the log simply ending.
+    setEvents((prev) => appendEvent(prev, createEvent({
+      category: EVENT_CATEGORY.STATE,
+      message: what === CLEARABLE.LOG
+        ? 'Stored event log cleared'
+        : what === CLEARABLE.CONFIG
+          ? 'Stored configuration cleared — defaults restored'
+          : 'Stored configuration and event log cleared — defaults restored',
+    })))
+  }, [])
+
   // Ticks while either the audio pause or the oxygen flush is counting down.
   useEffect(() => {
     const pausing = audioPausedUntil > Date.now()
@@ -220,6 +301,18 @@ export default function App() {
     setPendingSettings(next)
   }, [ventilating, settings.mode])
 
+
+  // Simulation inputs apply immediately, ventilating or not: they are not
+  // delivered to anyone, so there is nothing to acknowledge, and staging them
+  // behind Save would hide the response that makes the change worth making.
+  //
+  // Any staged edit is patched in the same breath. Leaving it untouched would
+  // let a later Save write back the effort the operator had already moved on
+  // from, silently undoing a simulation change with a settings change.
+  const changeSimulation = useCallback((patch) => {
+    setSettings((s) => ({ ...s, ...patch }))
+    setPendingSettings((p) => (p ? { ...p, ...patch } : p))
+  }, [])
 
   const acceptPending = useCallback(() => {
     if (!pendingSettings) return
@@ -464,6 +557,10 @@ export default function App() {
             setLanguage(next)
             log({ category: EVENT_CATEGORY.SETTING, message: `Interface language changed to ${next}` })
           }}
+          events={events}
+          restoredAt={restored.savedAt}
+          storageError={storageError}
+          onClearStorage={clearStorage}
           canEdit={!ventilating}
           blockedReason="Feature configuration is unavailable while ventilating. Stop ventilation to make changes."
           onExit={() => {
@@ -601,6 +698,7 @@ export default function App() {
                     onSettingsChange={changeSettings}
                     patientKey={patientKey}
                     onPatientChange={setPatientKey}
+                    onEffortChange={(effort) => changeSimulation({ effort })}
                     patientCategory={patientData.category}
                     onManeuver={() => {}}
                     t={t}
@@ -657,6 +755,7 @@ export default function App() {
                     onSettingsChange={changeSettings}
                     patientKey={patientKey}
                     onPatientChange={setPatientKey}
+                    onEffortChange={(effort) => changeSimulation({ effort })}
                     patientCategory={patientData.category}
                     onManeuver={(type) => {
                       startManeuver(type)
