@@ -4,7 +4,7 @@ import { MODES, DEFAULT_MODE } from '../engine/ventilatorModes/index.js'
 import { getBreathTiming } from '../engine/ventilatorModes/breathTiming.js'
 import { evaluateAlarms } from '../engine/alarms.js'
 import { computeMeasurements } from '../engine/measurements.js'
-import { MANEUVER, HOLD_DURATION_SECONDS, maneuverResult } from '../engine/maneuvers.js'
+import { MANEUVER, maneuverResult, maxHoldSeconds, shouldAutoRelease } from '../engine/maneuvers.js'
 import { EFFORT_PRESETS, DEFAULT_EFFORT } from '../engine/spontaneousEffort.js'
 import { targetSpo2, stepSpo2 } from '../engine/oxygenation.js'
 
@@ -59,6 +59,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
   const [alarms, setAlarms] = useState([])
   const [spo2, setSpo2] = useState(null)
   const [live, setLive] = useState({ volume: 0, phase: null })
+  const [holdState, setHoldState] = useState({ active: null, pending: null, elapsed: 0 })
   const [maneuver, setManeuver] = useState(null)
 
   const maneuverRef = useRef(null)
@@ -139,7 +140,9 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
       timeRef.current += dt
       lastBreathTimeRef.current += dt // a hold is not an apnea
 
-      if (maneuverElapsedRef.current >= HOLD_DURATION_SECONDS) {
+      // A hold suspends ventilation, so it releases itself at its maximum
+      // rather than relying on the operator to end it.
+      if (shouldAutoRelease(maneuverRef.current, maneuverElapsedRef.current)) {
         maneuverRef.current = null
         maneuverElapsedRef.current = 0
       }
@@ -271,6 +274,14 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
         volume: modeStateRef.current.volume ?? 0,
         phase: modeStateRef.current.phase ?? null,
       })
+      setHoldState({
+        active: maneuverRef.current,
+        pending: pendingManeuverRef.current,
+        elapsed: maneuverElapsedRef.current,
+        remaining: maneuverRef.current
+          ? Math.max(0, maxHoldSeconds(maneuverRef.current) - maneuverElapsedRef.current)
+          : 0,
+      })
       frameHandle = requestAnimationFrame(render)
     }
 
@@ -301,7 +312,19 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
   // Holds are armed and then captured at the correct point in the breath:
   // an inspiratory hold at end inspiration, an expiratory hold at end
   // expiration, which is where each reading is meaningful.
+  // Toggle semantics: requesting a maneuver that is already armed or running
+  // releases it, so the same control both starts and ends the hold.
   const startManeuver = useCallback((type) => {
+    if (maneuverRef.current === type) {
+      maneuverRef.current = null
+      maneuverElapsedRef.current = 0
+      return
+    }
+    if (pendingManeuverRef.current === type) {
+      pendingManeuverRef.current = null
+      setManeuver(null)
+      return
+    }
     if (maneuverRef.current) return
     pendingManeuverRef.current = type
     setManeuver({ label: labelFor(type), pending: true, readings: [] })
@@ -333,7 +356,7 @@ export function useVentilatorEngine({ settings, patient, ventilating, technical,
   }, [resetBreathTracking])
 
   return {
-    waveform, loop, numerics, measurements, alarms, spo2, live, reset,
+    waveform, loop, numerics, measurements, alarms, spo2, live, holdState, reset,
     maneuver, startManeuver, clearManeuver,
   }
 }
