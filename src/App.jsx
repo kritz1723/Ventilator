@@ -18,6 +18,7 @@ import AdminScreen from './components/AdminScreen.jsx'
 import PendingChangesBar from './components/PendingChangesBar.jsx'
 import AutosetProposal from './components/AutosetProposal.jsx'
 import LungIllustration from './components/LungIllustration.jsx'
+import ScreenLockOverlay from './components/ScreenLockOverlay.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
 import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
@@ -41,6 +42,7 @@ import { proposeLimits } from './engine/autoThresholds.js'
 import {
   startFlush, flushRemaining, isFlushActive, effectiveFio2, FLUSH_DURATION_SECONDS,
 } from './engine/oxygenation.js'
+import { LOCK_STATE, isSetupLocked } from './engine/screenLock.js'
 import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
 } from './engine/eventLog.js'
@@ -79,6 +81,7 @@ export default function App() {
   const [confirm, setConfirm] = useState(null)
   const [autoset, setAutoset] = useState(null)
   const [flush, setFlush] = useState(null)
+  const [lockState, setLockState] = useState(LOCK_STATE.UNLOCKED)
   const [now, setNow] = useState(Date.now())
 
   const t = makeTranslator(language)
@@ -87,6 +90,8 @@ export default function App() {
   // Configuration is reachable only from standby: changing the platform
   // while ventilating would alter behaviour underneath the operator.
   const canConfigure = screen === SCREEN.STANDBY
+  const setupLocked = isSetupLocked(screen === SCREEN.VENTILATING)
+  const screenLocked = lockState === LOCK_STATE.LOCKED
   const editedSettings = pendingSettings ?? settings
   // The licence filters the registry itself, so an unlicensed mode is
   // unreachable rather than merely hidden.
@@ -349,6 +354,18 @@ export default function App() {
               />
             ))}
           </div>
+          {ventilating && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-tiny"
+              onClick={() => {
+                setLockState(LOCK_STATE.LOCKED)
+                log({ category: EVENT_CATEGORY.STATE, message: 'Screen locked' })
+              }}
+            >
+              Lock screen
+            </button>
+          )}
           {screen !== SCREEN.ADMIN && (
             <button
               type="button"
@@ -432,6 +449,7 @@ export default function App() {
             }}
             t={t}
             onAutoset={requestAutoset}
+            setupLocked={setupLocked}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">
@@ -539,6 +557,14 @@ export default function App() {
         </main>
       )}
 
+      <ScreenLockOverlay
+        locked={screenLocked}
+        alarmActive={alarms.length > 0}
+        onUnlock={() => {
+          setLockState(LOCK_STATE.UNLOCKED)
+          log({ category: EVENT_CATEGORY.STATE, message: 'Screen unlocked' })
+        }}
+      />
       <AppFooter t={t} />
       <DeviceInfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
       <EventLogDrawer open={logOpen} onClose={() => setLogOpen(false)} events={events} />
