@@ -14,6 +14,7 @@ import AppFooter from './components/AppFooter.jsx'
 import SnapshotPanel from './components/SnapshotPanel.jsx'
 import EventLogDrawer from './components/EventLogDrawer.jsx'
 import ConfirmDialog from './components/ConfirmDialog.jsx'
+import AdminScreen from './components/AdminScreen.jsx'
 import PendingChangesBar from './components/PendingChangesBar.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
 import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
@@ -33,7 +34,12 @@ import {
   createEvent, appendEvent, diffSettings, diffAlarms, EVENT_CATEGORY,
 } from './engine/eventLog.js'
 
-const SCREEN = { POWER_ON: 'power-on', STANDBY: 'standby', VENTILATING: 'ventilating' }
+const SCREEN = {
+  POWER_ON: 'power-on',
+  STANDBY: 'standby',
+  VENTILATING: 'ventilating',
+  ADMIN: 'admin',
+}
 
 export default function App() {
   const [screen, setScreen] = useState(SCREEN.POWER_ON)
@@ -61,6 +67,9 @@ export default function App() {
 
   const patient = PATIENT_PRESETS[patientKey]
   const ventilating = screen === SCREEN.VENTILATING
+  // Configuration is reachable only from standby: changing the platform
+  // while ventilating would alter behaviour underneath the operator.
+  const canConfigure = screen === SCREEN.STANDBY
   const editedSettings = pendingSettings ?? settings
 
   const {
@@ -277,6 +286,22 @@ export default function App() {
               />
             ))}
           </div>
+          {screen !== SCREEN.ADMIN && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-tiny"
+              disabled={!canConfigure}
+              title={canConfigure
+                ? 'Open configuration and development documents'
+                : 'Available in standby only'}
+              onClick={() => {
+                setScreen(SCREEN.ADMIN)
+                log({ category: EVENT_CATEGORY.STATE, message: 'Entered configuration' })
+              }}
+            >
+              Config
+            </button>
+          )}
           <button type="button" className="btn btn-ghost btn-tiny" onClick={() => setLogOpen(true)}>
             Log{events.length ? ` (${events.length})` : ''}
           </button>
@@ -286,7 +311,12 @@ export default function App() {
         </div>
       </header>
 
-      {screen === SCREEN.STANDBY ? (
+      {screen === SCREEN.ADMIN ? (
+        <AdminScreen onExit={() => {
+          setScreen(SCREEN.STANDBY)
+          log({ category: EVENT_CATEGORY.STATE, message: 'Left configuration' })
+        }} />
+      ) : screen === SCREEN.STANDBY ? (
         <StandbyScreen
           patientData={patientData}
           onPatientDataChange={setPatientData}
