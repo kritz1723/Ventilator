@@ -9,7 +9,7 @@ export default function StatusBar({
   settings, availableModes, patientCategory, ventilating,
   alarms, onModeChange, modeLocked, t,
   themes, theme, onThemeChange, onOpenLog, onOpenInfo, logCount, onStopVentilation,
-  onOxygenFlush, flushActive, flushRemaining,
+  onOxygenFlush, flushActive, flushRemaining, onCapture, captureCount,
 }) {
   const [clock, setClock] = useState(() => new Date())
 
@@ -101,6 +101,24 @@ export default function StatusBar({
           </svg>
           {alarms.length}
         </span>
+        {/* A capture is taken at the moment something on the display is
+            worth keeping, which is while the operator is looking at it. The
+            page that reviews captures is not the page from which one is
+            taken. */}
+        {ventilating && onCapture && (
+          <button
+            type="button"
+            className="status-pill status-action status-capture"
+            onClick={onCapture}
+            aria-label="Capture the present values"
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" strokeLinejoin="round" />
+              <circle cx="12" cy="13" r="3.2" />
+            </svg>
+            Capture{captureCount ? ` ${captureCount}` : ''}
+          </button>
+        )}
         {/* Pre-oxygenation is done before suctioning and during a
             desaturation — both moments when the operator is watching the
             patient, not navigating. On a real device it is a dedicated key on

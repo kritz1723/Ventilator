@@ -22,6 +22,8 @@
 // Migrating a half-understood old shape into new code is how a stale field
 // ends up driving a setting nobody set.
 
+import { CONFIG_FIELDS } from './configDefaults.js'
+
 export const STORAGE_VERSION = 1
 
 export const STORAGE_KEYS = {
@@ -81,18 +83,10 @@ function writeKey(key, payload) {
 }
 
 // Fields of the application state that are configuration rather than running
-// state. Anything not named here is rebuilt on load.
-export const PERSISTED_CONFIG_FIELDS = [
-  'settings',
-  'patientData',
-  'patientKey',
-  'theme',
-  'selectedMeasurements',
-  'layout',
-  'licence',
-  'units',
-  'language',
-]
+// state. Derived from the defaults rather than listed again here: a
+// hand-maintained second list drifts, and a field present in one and absent
+// from the other silently fails to save.
+export const PERSISTED_CONFIG_FIELDS = CONFIG_FIELDS
 
 // Stored values are merged over the defaults rather than replacing them, so a
 // field added after the cache was written takes its default instead of

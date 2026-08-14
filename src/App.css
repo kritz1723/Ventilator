@@ -419,6 +419,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
 }
 
 .waveform-header {
@@ -434,12 +435,18 @@
   letter-spacing: 0.05em;
 }
 
+/* Traces share out whatever height the panel has rather than each taking a
+   fixed number of pixels. With fixed heights the panel filled from the top
+   and left a band of dead space below the last trace — the same disproportion
+   the workspace was introduced to remove, one level further down. */
 .trace-row {
   display: flex;
   align-items: stretch;
   gap: 12px;
   padding: 5px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.045);
+  flex: 1 1 0;
+  min-height: 84px;
 }
 
 .trace-row:first-of-type { border-top: none; }
@@ -473,7 +480,8 @@
 .trace-canvas {
   flex: 1;
   min-width: 0;
-  height: 118px;
+  height: auto;
+  min-height: 64px;
   border-radius: var(--radius-sm);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent),
@@ -1109,7 +1117,7 @@
 .trace-edit-buttons button:hover:not(:disabled) { color: var(--text-primary); }
 .trace-edit-buttons button:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.trace-row-compact .trace-canvas { height: 78px; }
+.trace-row-compact { min-height: 62px; }
 .trace-row-compact .trace-legend { width: 74px; }
 
 /* ---------- Pending changes ---------- */
@@ -1558,19 +1566,28 @@
 }
 
 /* ---------- Home page ---------- */
-.page-home {
-  flex: 1; min-height: 0;
-  display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 1.15fr); gap: 10px;
-}
-.page-home-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.page-home { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .page-stack, .page-settings { display: flex; flex-direction: column; gap: 10px; }
 .page-settings .control-panel { position: static; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 10px; }
 
 /* ---------- Lung hero ---------- */
 .lung-hero { padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-.hero-arcs { position: relative; flex: 1; display: grid; place-items: center; min-height: 300px; }
-.hero-arcs > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero-lung { position: relative; width: 52%; max-width: 220px; }
+/* The arcs are square and bounded. Left to fill the panel they stretched to
+   whatever height the row happened to have, which on a wide screen produced
+   a circle taller than the waveforms beside it and a band of empty space
+   around everything else. */
+.hero-arcs {
+  position: relative; flex: 1; min-height: 0;
+  display: grid; place-items: center;
+  container-type: size;
+}
+/* Square, and no larger than the smaller side of the panel — the arcs are a
+   circle, so sizing them from one axis alone stretches them into an oval. */
+.hero-arcs > svg {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(100cqw, 100cqh); height: min(100cqw, 100cqh);
+}
+.hero-lung { position: relative; width: min(30cqw, 30cqh); }
 
 .arc { transition: opacity 200ms ease, stroke-width 200ms ease; }
 .arc.is-idle { opacity: 0.22; }
@@ -1687,8 +1704,9 @@
   min-width: 42px; text-align: center; font-size: 10px; color: var(--text-secondary);
 }
 .x-zoom-title { font-size: 10.5px; color: var(--text-muted); margin-right: 2px; }
-.trace-canvas { height: 118px; }
-.trace-row:last-child .trace-canvas { height: 132px; }
+/* The last trace carries the time axis, so it is given a little more room
+   than its siblings rather than a fixed height of its own. */
+.trace-row:last-child { flex-grow: 1.12; }
 .status-action { cursor: pointer; }
 .status-action:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .status-bar .theme-picker { display: flex; gap: 4px; }
@@ -1825,3 +1843,82 @@
 .status-o2.active {
   color: var(--ok); border-color: rgba(95,224,143,0.55); background: rgba(95,224,143,0.14);
 }
+
+/* ---------- Workspace ---------- */
+.workspace {
+  --ws-divider: 8px;
+  flex: 1; min-height: 0;
+  display: grid;
+  align-items: stretch;
+}
+.workspace .ws-gap { width: 8px; height: 8px; }
+.ws-column { min-width: 0; min-height: 0; display: grid; align-items: stretch; }
+.ws-panel {
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+/* The panel body is what scrolls, so a panel made small stays usable rather
+   than pushing its neighbours out of the layout. */
+.ws-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ws-panel-body > * { flex: 1; min-height: 0; }
+
+.ws-divider {
+  position: relative; display: grid; place-items: center;
+  border-radius: 999px; background: transparent;
+  transition: background 140ms ease;
+}
+.ws-divider:hover, .ws-divider:focus-visible { background: rgba(76,196,245,0.14); outline: none; }
+.ws-divider-vertical { cursor: col-resize; }
+.ws-divider-horizontal { cursor: row-resize; }
+.ws-divider-grip { display: block; border-radius: 999px; background: var(--border-strong); }
+.ws-divider-vertical .ws-divider-grip { width: 3px; height: 34px; }
+.ws-divider-horizontal .ws-divider-grip { width: 34px; height: 3px; }
+.ws-divider:hover .ws-divider-grip, .ws-divider:focus-visible .ws-divider-grip { background: var(--accent); }
+
+.workspace.is-arranging .ws-panel {
+  outline: 1px dashed rgba(76,196,245,0.35); outline-offset: 2px; border-radius: var(--radius-md);
+}
+.ws-arrange-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 3px 6px 3px 9px; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: rgba(76,196,245,0.12); border-bottom: 1px solid rgba(76,196,245,0.22);
+}
+.ws-arrange-name {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--accent);
+}
+.ws-arrange-actions { display: flex; gap: 3px; }
+.ws-move {
+  width: 21px; height: 21px; display: grid; place-items: center;
+  font-size: 9px; line-height: 1; border-radius: var(--radius-sm);
+  color: var(--text-secondary); background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+}
+.ws-move:hover:not(:disabled) { color: var(--accent); border-color: rgba(76,196,245,0.45); }
+.ws-move:disabled { opacity: 0.28; cursor: not-allowed; }
+.ws-hide:hover:not(:disabled) { color: var(--danger); border-color: rgba(255,95,109,0.45); }
+
+.ws-toolbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(76,196,245,0.10), var(--surface-2));
+  border: 1px solid rgba(76,196,245,0.28);
+}
+.ws-toolbar-group { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.ws-toolbar-end { margin-left: auto; }
+.ws-toolbar-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-right: 3px;
+}
+.ws-toolbar-note {
+  flex-basis: 100%; margin: 0; font-size: 10.5px; color: var(--text-muted);
+}
+.ws-arrange-toggle { flex: none; }
+
+.ws-arrange-row { display: flex; justify-content: flex-end; }
+
+.status-capture:hover { color: var(--accent); border-color: rgba(76,196,245,0.42); }
+/* The hold result sits above the shell body so it is read where the trace
+   that produced it is, rather than on another page. */
+.device-shell > .maneuver-result { margin: 0; }
