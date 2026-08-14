@@ -1244,6 +1244,18 @@ export const REQUIREMENTS = [
     risks: ['RSK-072'],
     tests: ['TC-081'],
   },
+  {
+    id: 'REQ-094',
+    title: 'Pre-oxygenation from the primary display',
+    type: REQUIREMENT_TYPES.SAFETY,
+    feature: 'oxygenation',
+    text: 'While ventilating, the Simulator shall present the control for 100 % oxygen delivery on the primary display together with the time remaining while it is running.',
+    rationale: 'Pre-oxygenation is performed before suctioning and during a desaturation, both moments when the operator is watching the patient rather than navigating; on the equipment it imitates this is a dedicated key on the front panel.',
+    profiles: ['UP-01', 'UP-02'],
+    verification: VERIFICATION.DEMONSTRATION,
+    risks: ['RSK-071'],
+    tests: ['TC-082'],
+  },
 ]
 
 export function requirementById(id) {

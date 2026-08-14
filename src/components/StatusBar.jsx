@@ -9,6 +9,7 @@ export default function StatusBar({
   settings, availableModes, patientCategory, ventilating,
   alarms, onModeChange, modeLocked, t,
   themes, theme, onThemeChange, onOpenLog, onOpenInfo, logCount, onStopVentilation,
+  onOxygenFlush, flushActive, flushRemaining,
 }) {
   const [clock, setClock] = useState(() => new Date())
 
@@ -100,6 +101,23 @@ export default function StatusBar({
           </svg>
           {alarms.length}
         </span>
+        {/* Pre-oxygenation is done before suctioning and during a
+            desaturation — both moments when the operator is watching the
+            patient, not navigating. On a real device it is a dedicated key on
+            the front panel; here it belongs on the bar that is always
+            present, not on a page reached by choice. */}
+        {ventilating && onOxygenFlush && (
+          <button
+            type="button"
+            className={flushActive ? 'status-pill status-o2 active' : 'status-pill status-o2'}
+            onClick={onOxygenFlush}
+            aria-label={flushActive
+              ? `100 percent oxygen, ${flushRemaining} seconds remaining`
+              : 'Deliver 100 percent oxygen for two minutes'}
+          >
+            O₂ {flushActive ? `${flushRemaining}s` : '100%'}
+          </button>
+        )}
         {/* Stopping ventilation is a decision that can be needed at once, so
             it stays on the top bar rather than inside a settings page. It is
             still confirmed before it takes effect. */}
