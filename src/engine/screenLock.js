@@ -2,11 +2,19 @@
 //
 // Two distinct protections that are easy to conflate:
 //
-// The setup lockout is permanent while ventilating. Patient category, the
-// simulated lung and its effort describe who is being ventilated, not how —
-// changing them mid-therapy would redefine the patient underneath the
-// operator, so they are unavailable until ventilation stops. This is not a
-// convenience lock and has no override.
+// The setup lockout is permanent while ventilating, but it covers less than
+// it first appears to.
+//
+// Patient category and the demographics behind it bound the permitted range
+// of every setting, so changing them mid-therapy would move the bounds
+// underneath the operator. Those stay locked, with no override.
+//
+// The simulated lung and its spontaneous effort are deliberately NOT locked.
+// On a real device the patient's mechanics are an input from the world, not a
+// control. Here they are the subject being taught: watching pressure rise as
+// compliance falls, or a patient begin to trigger, is the demonstration the
+// simulator exists to give, and it has to be possible without stopping
+// ventilation first. Treating them as patient identity was a category error.
 //
 // The screen lock is a deliberate, operator-controlled guard against
 // accidental contact, for transport or cleaning. It is unlocked by a
@@ -31,11 +39,16 @@ export const UNLOCK_HOLD_MS = 1200
 // locked out for the whole of ventilation.
 export const SETUP_CONTROLS = [
   'patientCategory',
-  'patientPreset',
-  'spontaneousEffort',
   'patientHeight',
   'patientSex',
   'featureConfiguration',
+]
+
+// Simulation inputs: changeable at any time, including during ventilation,
+// because changing them is the point of the simulator.
+export const SIMULATION_CONTROLS = [
+  'patientPreset',
+  'spontaneousEffort',
 ]
 
 export function isSetupLocked(ventilating) {
@@ -46,7 +59,11 @@ export function setupLockReason(control) {
   if (control === 'featureConfiguration') {
     return 'Feature configuration is unavailable while ventilating. Stop ventilation to make changes.'
   }
-  return 'Patient setup is unavailable while ventilating. Stop ventilation to change it.'
+  return 'Patient category bounds every setting range, so it cannot be changed while ventilating.'
+}
+
+export function isSimulationControl(control) {
+  return SIMULATION_CONTROLS.includes(control)
 }
 
 // While the screen is locked, only actions that are themselves safety

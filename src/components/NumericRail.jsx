@@ -67,12 +67,24 @@ function Tile({ entry, ctx, units }) {
   )
 }
 
-export default function NumericRail({ numerics, measurements, settings, selected, units }) {
+export default function NumericRail({
+  numerics, measurements, settings, selected, units, onConfigure,
+}) {
   const ctx = { numerics, measurements, settings }
   const shown = MEASUREMENT_CATALOG.filter((m) => selected.includes(m.id))
 
   return (
     <div className="numeric-rail">
+      {onConfigure && (
+        <button type="button" className="rail-configure" onClick={onConfigure}>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 8h10M18 8h2M4 16h4M12 16h8" strokeLinecap="round" />
+            <circle cx="16" cy="8" r="2" />
+            <circle cx="10" cy="16" r="2" />
+          </svg>
+          Values
+        </button>
+      )}
       {shown.map((entry) => (
         <Tile key={entry.id} entry={entry} ctx={ctx} units={units} />
       ))}

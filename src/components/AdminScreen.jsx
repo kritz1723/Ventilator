@@ -6,11 +6,13 @@ import { TEST_CASES, testCaseById, automatedCount } from '../docs/testCases.js'
 import LicensingTab from './LicensingTab.jsx'
 import UnitsTab from './UnitsTab.jsx'
 import LanguageTab from './LanguageTab.jsx'
+import StorageTab from './StorageTab.jsx'
 
 const TABS = [
   { id: 'licensing', label: 'Features' },
   { id: 'units', label: 'Units' },
   { id: 'language', label: 'Language' },
+  { id: 'storage', label: 'Stored data' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'risks', label: 'Risk / DFMEA' },
   { id: 'tests', label: 'Test cases' },
@@ -274,6 +276,7 @@ function ProfilesTab() {
 export default function AdminScreen({
   onExit, licence, onLicenceChange, canEdit, blockedReason,
   units, onUnitsChange, language, onLanguageChange, t = (k) => k,
+  events = [], restoredAt = null, storageError = null, onClearStorage = () => {},
 }) {
   const [tab, setTab] = useState('licensing')
 
@@ -314,6 +317,14 @@ export default function AdminScreen({
         {tab === 'units' && <UnitsTab units={units} onUnitsChange={onUnitsChange} />}
         {tab === 'language' && (
           <LanguageTab language={language} onLanguageChange={onLanguageChange} />
+        )}
+        {tab === 'storage' && (
+          <StorageTab
+            events={events}
+            restoredAt={restoredAt}
+            storageError={storageError}
+            onClear={onClearStorage}
+          />
         )}
         {tab === 'requirements' && <RequirementsTab />}
         {tab === 'risks' && <RisksTab />}

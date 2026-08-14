@@ -35,6 +35,7 @@ export default function ControlPanel({
   onSettingsChange,
   patientKey,
   onPatientChange,
+  onEffortChange,
   patientCategory,
   onManeuver,
   onStopVentilation,
@@ -194,19 +195,23 @@ export default function ControlPanel({
       </section>
       )}
 
+      {/* The simulated lung sits outside the edit and save batch that guards
+          the therapy settings. It is not a setting the device delivers — it
+          is the world the therapy acts on, and the response to changing it is
+          the demonstration. Putting it behind Edit, Save and a confirmation
+          would make the most-used control on the page the slowest. */}
       <section className="panel control-section">
         <div className="section-head">
           <span className="panel-title">{t('panel.simulatedLung')}</span>
-          {setupLocked && <span className="setup-locked-tag">Locked</span>}
+          <span className="setup-live-tag">Live</span>
         </div>
-        {setupLocked && (
-          <p className="setup-locked-note">
-            Patient setup is unavailable while ventilating. Stop ventilation to
-            change it.
-          </p>
-        )}
+        <p className="setup-locked-note">
+          Lung mechanics and effort take effect immediately, ventilating or
+          not, and without passing through Save — watching the response is the
+          demonstration.
+        </p>
         <div className="select-wrap">
-          <select value={patientKey} disabled={setupLocked || readOnly} onChange={(e) => onPatientChange(e.target.value)}>
+          <select value={patientKey} onChange={(e) => onPatientChange(e.target.value)}>
             {Object.entries(PATIENT_PRESETS).map(([key, preset]) => (
               <option key={key} value={key}>{preset.label}</option>
             ))}
@@ -219,7 +224,7 @@ export default function ControlPanel({
         <label className="field field-stacked">
           <span className="field-label">{t('field.spontaneousEffort')}</span>
           <div className="select-wrap">
-            <select value={settings.effort} disabled={setupLocked || readOnly} onChange={(e) => update({ effort: e.target.value })}>
+            <select value={settings.effort} onChange={(e) => onEffortChange(e.target.value)}>
               {Object.values(EFFORT_PRESETS).map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
