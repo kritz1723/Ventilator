@@ -47,8 +47,14 @@ export const MEASUREMENT_CATALOG = [
     read: ({ numerics }) => fmt(numerics.peakFlow),
   },
   {
+    id: 'spo2', label: 'SpO₂', unit: '%', tone: 'ok', group: 'Gas',
+    read: ({ numerics }) => fmt(numerics.spo2),
+  },
+  {
     id: 'fio2', label: 'FiO₂', unit: '%', tone: 'neutral', group: 'Gas',
-    read: ({ settings }) => fmt(settings.fio2),
+    // The delivered value, which differs from the set value while an oxygen
+    // flush is running. The monitor reports what the patient is receiving.
+    read: ({ numerics, settings }) => fmt(numerics.fio2 ?? settings.fio2),
   },
   {
     id: 'cstat', label: 'Cstat', unit: 'mL/cmH₂O', tone: 'mech', group: 'Mechanics',
@@ -86,5 +92,4 @@ export const MEASUREMENT_CATALOG = [
 ]
 
 export const DEFAULT_SELECTED_MEASUREMENTS = [
-  'ppeak', 'pplat', 'peep', 'vte', 'mv', 'rr', 'fio2', 'cstat',
-]
+  'ppeak', 'pplat', 'peep', 'vte', 'mv', 'rr', 'fio2', 'cstat', 'spo2']
