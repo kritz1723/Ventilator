@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { CONFIG_DEFAULTS, CONFIG_FIELDS } from '../src/state/configDefaults.js'
 import {
   STORAGE_KEYS, STORAGE_VERSION, PERSISTED_CONFIG_FIELDS, CLEARABLE,
   mergeConfig, loadConfig, saveConfig, loadEvents, saveEvents, clearStored,
@@ -79,7 +80,14 @@ describe('configuration round trip', () => {
   it('stores only the declared configuration fields', () => {
     saveConfig({ ...DEFAULTS, screen: 'ventilating', alarms: ['x'], waveform: [1, 2, 3] })
     const payload = JSON.parse(globalThis.localStorage.getItem(STORAGE_KEYS.CONFIG))
-    expect(Object.keys(payload.config).sort()).toEqual([...PERSISTED_CONFIG_FIELDS].sort())
+    // A subset rather than an equality: a field absent from the object being
+    // saved is simply not written, and this fixture is deliberately partial.
+    for (const key of Object.keys(payload.config)) {
+      expect(PERSISTED_CONFIG_FIELDS, key).toContain(key)
+    }
+    for (const key of ['screen', 'alarms', 'waveform']) {
+      expect(Object.keys(payload.config), key).not.toContain(key)
+    }
   })
 
   // Restoring a device into "ventilating" from a cache would be a fiction.
@@ -232,5 +240,39 @@ describe('reporting stored size', () => {
     expect(formatBytes(512)).toBe('512 B')
     expect(formatBytes(2048)).toBe('2.0 kB')
     expect(formatBytes(3 * 1024 * 1024)).toBe('3.0 MB')
+  })
+})
+
+// A hand-maintained second list of persisted fields is a list that drifts:
+// a field added to the defaults and forgotten in the list is silently never
+// saved, and the symptom — a setting that quietly fails to survive a reload
+// — points at storage rather than at the omission. Deriving one from the
+// other removes the failure mode; this holds it removed.
+describe('the persisted field list cannot drift from the defaults', () => {
+  it('persists exactly the fields the defaults define', () => {
+    expect([...PERSISTED_CONFIG_FIELDS].sort()).toEqual([...CONFIG_FIELDS].sort())
+  })
+
+  it('gives every configuration field a default', () => {
+    for (const field of PERSISTED_CONFIG_FIELDS) {
+      expect(CONFIG_DEFAULTS[field], field).toBeDefined()
+    }
+  })
+
+  it('round-trips every configuration field the application holds', () => {
+    saveConfig(CONFIG_DEFAULTS)
+    const loaded = loadConfig(CONFIG_DEFAULTS)
+    for (const field of CONFIG_FIELDS) {
+      expect(loaded.config[field], field).toBeDefined()
+    }
+  })
+
+  // Running state must stay out of the stored payload, whatever is added to
+  // the configuration in future.
+  it('names no running state among the persisted fields', () => {
+    const running = ['screen', 'alarms', 'waveform', 'flush', 'frozen', 'events', 'snapshots', 'lockState', 'arranging']
+    for (const field of running) {
+      expect(PERSISTED_CONFIG_FIELDS, field).not.toContain(field)
+    }
   })
 })

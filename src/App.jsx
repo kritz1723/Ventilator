@@ -27,21 +27,22 @@ import SettingTiles from './components/SettingTiles.jsx'
 import SettingsToolbar from './components/SettingsToolbar.jsx'
 import SaveConfirmDialog from './components/SaveConfirmDialog.jsx'
 import MeasurementPicker from './components/MeasurementPicker.jsx'
+import Workspace from './components/Workspace.jsx'
+import ArrangeToolbar from './components/ArrangeToolbar.jsx'
 import { useVentilatorEngine } from './state/useVentilatorEngine.js'
-import { DEFAULT_SETTINGS, DEFAULT_PATIENT_DATA } from './state/defaultSettings.js'
-import { PATIENT_PRESETS, DEFAULT_PATIENT_PRESET } from './engine/patientPresets.js'
+import { PATIENT_PRESETS } from './engine/patientPresets.js'
 import { PATIENT_CATEGORIES } from './engine/patientCategories.js'
 import { TEST_SUITES } from './engine/selfTests.js'
 import { AUDIO_PAUSE_SECONDS } from './engine/alarms.js'
-import { THEMES, DEFAULT_THEME } from './config/themes.js'
-import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
+import { THEMES } from './config/themes.js'
 import { MODES, DEFAULT_MODE } from './engine/ventilatorModes/index.js'
 import {
-  DEFAULT_LICENCE, isEnabled, licensedModes, resolveActiveMode,
+  isEnabled, licensedModes, resolveActiveMode,
 } from './config/licensing.js'
-import { DEFAULT_UNITS } from './config/units.js'
-import { DEFAULT_LANGUAGE, makeTranslator } from './config/i18n.js'
-import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
+import { makeTranslator } from './config/i18n.js'
+import {
+  scaleFactor, applyPreset, setPanelVisible, normaliseWorkspace,
+} from './config/workspace.js'
 import {
   CONFIRMABLE, pendingDiff, clampToRanges,
 } from './engine/pendingChanges.js'
@@ -57,27 +58,13 @@ import {
 import {
   loadConfig, saveConfig, loadEvents, saveEvents, clearStored, CLEARABLE,
 } from './state/persistence.js'
+import { CONFIG_DEFAULTS } from './state/configDefaults.js'
 
 const SCREEN = {
   POWER_ON: 'power-on',
   STANDBY: 'standby',
   VENTILATING: 'ventilating',
   ADMIN: 'admin',
-}
-
-// The configuration that survives a reload, with the values it falls back to
-// when nothing has been stored. Running state is deliberately absent: a
-// reload always comes up in power-on and standby with nothing delivered.
-const CONFIG_DEFAULTS = {
-  settings: DEFAULT_SETTINGS,
-  patientData: DEFAULT_PATIENT_DATA,
-  patientKey: DEFAULT_PATIENT_PRESET,
-  theme: DEFAULT_THEME,
-  selectedMeasurements: DEFAULT_SELECTED_MEASUREMENTS,
-  layout: DEFAULT_LAYOUT,
-  licence: DEFAULT_LICENCE,
-  units: DEFAULT_UNITS,
-  language: DEFAULT_LANGUAGE,
 }
 
 export default function App() {
@@ -111,6 +98,11 @@ export default function App() {
   const [licence, setLicence] = useState(stored.licence)
   const [units, setUnits] = useState(stored.units)
   const [language, setLanguage] = useState(stored.language)
+  // A stored layout is checked before use: one naming a panel that no longer
+  // exists would render as an empty column that reads as a fault.
+  const [workspace, setWorkspace] = useState(() => normaliseWorkspace(stored.workspace))
+  const [displayScale, setDisplayScale] = useState(stored.displayScale)
+  const [arranging, setArranging] = useState(false)
   // While ventilating, edits go to a pending copy and reach the patient only
   // when accepted. In standby they apply directly — nothing is being
   // delivered, so there is nothing to guard.
@@ -202,17 +194,21 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--ui-scale', String(scaleFactor(displayScale)))
+  }, [displayScale])
+
   // Configuration is written back whenever it changes. It is small and
   // changes at operator speed, so writing on change costs less than any
   // scheme for deciding when to write, and never leaves a change unsaved.
   useEffect(() => {
     const result = saveConfig({
       settings, patientData, patientKey, theme, selectedMeasurements,
-      layout, licence, units, language,
+      layout, licence, units, language, workspace, displayScale,
     })
     setStorageError(result.ok ? null : result.reason)
   }, [settings, patientData, patientKey, theme, selectedMeasurements,
-    layout, licence, units, language])
+    layout, licence, units, language, workspace, displayScale])
 
   // The log is written separately because it is the part that grows, and
   // because a quota failure on the log must not take the configuration with
@@ -237,6 +233,8 @@ export default function App() {
       setLicence(CONFIG_DEFAULTS.licence)
       setUnits(CONFIG_DEFAULTS.units)
       setLanguage(CONFIG_DEFAULTS.language)
+      setWorkspace(CONFIG_DEFAULTS.workspace)
+      setDisplayScale(CONFIG_DEFAULTS.displayScale)
     }
     if (what === CLEARABLE.LOG || what === CLEARABLE.ALL) {
       setEvents([])
@@ -608,11 +606,19 @@ export default function App() {
             onOpenInfo={() => setInfoOpen(true)}
             logCount={events.length}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
+            onCapture={isEnabled(licence, 'captures') ? capture : null}
+            captureCount={snapshots.length}
             onOxygenFlush={startOxygenFlush}
             flushActive={flushActive}
             flushRemaining={flushLeft}
             t={t}
           />
+
+          {/* The result of a hold. An inspiratory hold exists to produce a
+              plateau pressure and an expiratory hold to expose intrinsic
+              PEEP; the restructure left the reading computed and never
+              shown, which made both maneuvers pointless. */}
+          <ManeuverResult maneuver={maneuver} onClose={clearManeuver} />
 
           <div className="shell-body">
             <NumericRail
@@ -650,30 +656,67 @@ export default function App() {
 
               {page === 'home' && (
                 <div className="page-home">
-                  <LungHero
-                    live={live}
-                    settings={settings}
-                    patient={patient}
-                    spo2={spo2}
-                    numerics={numerics}
-                    holdState={holdState}
-                    frozen={frozen}
-                    onToggleFreeze={toggleFreeze}
-                    t={t}
+                  <ArrangeToolbar
+                    arranging={arranging}
+                    onArrangingChange={(next) => {
+                      setArranging(next)
+                      if (!next) {
+                        log({ category: EVENT_CATEGORY.STATE, message: 'Display layout changed' })
+                      }
+                    }}
+                    workspace={workspace}
+                    onWorkspaceChange={(panelId, visible) => {
+                      setWorkspace((w) => setPanelVisible(w, panelId, visible))
+                    }}
+                    onPreset={(presetId) => setWorkspace(applyPreset(presetId))}
+                    displayScale={displayScale}
+                    onDisplayScaleChange={setDisplayScale}
+                    onReset={() => {
+                      setWorkspace(CONFIG_DEFAULTS.workspace)
+                      setDisplayScale(CONFIG_DEFAULTS.displayScale)
+                    }}
                   />
-                  <div className="page-home-right">
-                    <WaveformDisplay
-                      waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
-                      t={t}
-                      layout={layout}
-                      onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
-                      frozen={frozen}
-                      onToggleFreeze={toggleFreeze}
-                      cursors={cursors}
-                      onCursorsChange={setCursors}
-                    />
-                    {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
-                  </div>
+                  <Workspace
+                    workspace={workspace}
+                    onWorkspaceChange={setWorkspace}
+                    arranging={arranging}
+                    onHidePanel={(id) => setWorkspace((w) => setPanelVisible(w, id, false))}
+                    render={(panelId) => {
+                      if (panelId === 'lung') {
+                        return (
+                          <LungHero
+                            live={live}
+                            settings={settings}
+                            patient={patient}
+                            spo2={spo2}
+                            numerics={numerics}
+                            holdState={holdState}
+                            frozen={frozen}
+                            onToggleFreeze={toggleFreeze}
+                            t={t}
+                          />
+                        )
+                      }
+                      if (panelId === 'waveforms') {
+                        return (
+                          <WaveformDisplay
+                            waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
+                            t={t}
+                            layout={layout}
+                            onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
+                            frozen={frozen}
+                            onToggleFreeze={toggleFreeze}
+                            cursors={cursors}
+                            onCursorsChange={setCursors}
+                          />
+                        )
+                      }
+                      if (panelId === 'loops') {
+                        return isEnabled(licence, 'loops') ? <LoopsDisplay loop={loop} /> : null
+                      }
+                      return null
+                    }}
+                  />
                 </div>
               )}
 
