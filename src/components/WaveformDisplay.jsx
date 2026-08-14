@@ -218,6 +218,7 @@ function TraceRow({
 
 export default function WaveformDisplay({
   waveform, layout, onLayoutChange, frozen, onToggleFreeze, cursorIndex, onCursorChange,
+  t = (k) => k,
 }) {
   const [editing, setEditing] = useState(false)
   const { sweepSeconds, traces } = layout
@@ -241,11 +242,11 @@ export default function WaveformDisplay({
   return (
     <div className={frozen ? 'waveform-display panel is-frozen' : 'waveform-display panel'}>
       <div className="waveform-header">
-        <span className="panel-title">Waveforms</span>
+        <span className="panel-title">{t('panel.waveforms')}</span>
         <div className="waveform-tools">
           {frozen && cursorTime != null && <span className="cursor-time tnum">{cursorTime}s</span>}
           <label className="sweep-select">
-            <span>Sweep</span>
+            <span>{t('field.sweep')}</span>
             <select
               value={sweepSeconds}
               disabled={!onLayoutChange}
@@ -260,7 +261,7 @@ export default function WaveformDisplay({
               className={editing ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
               onClick={() => setEditing((v) => !v)}
             >
-              {editing ? 'Done' : 'Layout'}
+              {editing ? t('action.done') : t('action.layout')}
             </button>
           )}
           <button
@@ -268,7 +269,7 @@ export default function WaveformDisplay({
             className={frozen ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
             onClick={onToggleFreeze}
           >
-            {frozen ? 'Resume' : 'Freeze'}
+            {frozen ? t('action.resume') : t('action.freeze')}
           </button>
         </div>
       </div>

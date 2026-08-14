@@ -33,6 +33,7 @@ export default function ControlPanel({
   patientCategory,
   onManeuver,
   onStopVentilation,
+  t = (k) => k,
 }) {
   const update = (patch) => onSettingsChange({ ...settings, ...patch })
   const modes = availableModes ?? MODES
@@ -45,7 +46,7 @@ export default function ControlPanel({
   return (
     <aside className="control-panel">
       <section className="panel control-section">
-        <span className="panel-title">Mode</span>
+        <span className="panel-title">{t('panel.mode')}</span>
         <div className="mode-list">
           {Object.values(modes).map((m) => (
             <button
@@ -62,17 +63,17 @@ export default function ControlPanel({
       </section>
 
       <section className="panel control-section">
-        <span className="panel-title">Settings</span>
-        <NumberField label="Rate" unit="/min" value={settings.respRate}
+        <span className="panel-title">{t('panel.settings')}</span>
+        <NumberField label={t('field.rate')} unit="/min" value={settings.respRate}
           min={rrRange.min} max={rrRange.max} step={rrRange.step}
           onChange={(v) => update({ respRate: v })} />
 
         {mode.primaryControl === 'tidalVolume' ? (
-          <NumberField label="Tidal vol." unit="mL" value={settings.tidalVolume}
+          <NumberField label={t('field.tidalVolume')} unit="mL" value={settings.tidalVolume}
             min={vtRange.min} max={vtRange.max} step={vtRange.step}
             onChange={(v) => update({ tidalVolume: v })} />
         ) : (
-          <NumberField label="P insp." unit="cmH₂O" value={settings.pInsp}
+          <NumberField label={t('field.inspPressure')} unit="cmH₂O" value={settings.pInsp}
             min={piRange.min} max={piRange.max} step={piRange.step}
             onChange={(v) => update({ pInsp: v })} />
         )}
@@ -83,23 +84,23 @@ export default function ControlPanel({
         <NumberField label="FiO₂" unit="%" value={settings.fio2}
           min={COMMON_RANGES.fio2.min} max={COMMON_RANGES.fio2.max} step={COMMON_RANGES.fio2.step}
           onChange={(v) => update({ fio2: v })} />
-        <NumberField label="Insp. pause" unit="s" value={settings.pauseTime} min={0} max={1} step={0.1}
+        <NumberField label={t('field.inspPause')} unit="s" value={settings.pauseTime} min={0} max={1} step={0.1}
           onChange={(v) => update({ pauseTime: v })} />
-        <NumberField label="Trigger" unit="L/min" value={settings.triggerFlow} min={0.5} max={15} step={0.5}
+        <NumberField label={t('field.trigger')} unit="L/min" value={settings.triggerFlow} min={0.5} max={15} step={0.5}
           onChange={(v) => update({ triggerFlow: v })} />
         {mode.supportsPressureSupport && (
-          <NumberField label="P support" unit="cmH₂O" value={settings.pSupport} min={0} max={40} step={1}
+          <NumberField label={t('field.pSupport')} unit="cmH₂O" value={settings.pSupport} min={0} max={40} step={1}
             onChange={(v) => update({ pSupport: v })} />
         )}
         {mode.supportsCycleOff && (
-          <NumberField label="Cycle off" unit="%" value={settings.cycleOffPercent} min={5} max={70} step={5}
+          <NumberField label={t('field.cycleOff')} unit="%" value={settings.cycleOffPercent} min={5} max={70} step={5}
             onChange={(v) => update({ cycleOffPercent: v })} />
         )}
       </section>
 
       {mode.supportsFlowPattern && features.flowPatterns !== false && (
         <section className="panel control-section">
-          <span className="panel-title">Flow pattern</span>
+          <span className="panel-title">{t('panel.flowPattern')}</span>
           <div className="pattern-row">
             {Object.values(FLOW_PATTERNS).map((p) => (
               <button
@@ -118,7 +119,7 @@ export default function ControlPanel({
       )}
 
       <section className="panel control-section">
-        <span className="panel-title">Alarm limits</span>
+        <span className="panel-title">{t('panel.alarmLimits')}</span>
         <NumberField label="P high" unit="cmH₂O" value={settings.alarmLimits.highPressure}
           min={10} max={80} step={1}
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highPressure: v } })} />
@@ -141,16 +142,16 @@ export default function ControlPanel({
 
       {features.maneuvers !== false && (
       <section className="panel control-section">
-        <span className="panel-title">Maneuvers</span>
+        <span className="panel-title">{t('panel.maneuvers')}</span>
         <div className="maneuver-row">
-          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('inspHold')}>Insp. hold</button>
-          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('expHold')}>Exp. hold</button>
+          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('inspHold')}>{t('maneuver.inspHold')}</button>
+          <button type="button" className="btn btn-ghost" onClick={() => onManeuver('expHold')}>{t('maneuver.expHold')}</button>
         </div>
       </section>
       )}
 
       <section className="panel control-section">
-        <span className="panel-title">Simulated lung</span>
+        <span className="panel-title">{t('panel.simulatedLung')}</span>
         <div className="select-wrap">
           <select value={patientKey} onChange={(e) => onPatientChange(e.target.value)}>
             {Object.entries(PATIENT_PRESETS).map(([key, preset]) => (
@@ -163,7 +164,7 @@ export default function ControlPanel({
           <span>R <b className="tnum">{PATIENT_PRESETS[patientKey].resistance}</b> cmH₂O/L/s</span>
         </div>
         <label className="field field-stacked">
-          <span className="field-label">Spontaneous effort</span>
+          <span className="field-label">{t('field.spontaneousEffort')}</span>
           <div className="select-wrap">
             <select value={settings.effort} onChange={(e) => update({ effort: e.target.value })}>
               {Object.values(EFFORT_PRESETS).map((p) => (

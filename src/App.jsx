@@ -29,6 +29,7 @@ import {
   DEFAULT_LICENCE, isEnabled, licensedModes, resolveActiveMode,
 } from './config/licensing.js'
 import { DEFAULT_UNITS } from './config/units.js'
+import { DEFAULT_LANGUAGE, makeTranslator } from './config/i18n.js'
 import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
 import {
   CONFIRMABLE, pendingDiff, clampToRanges,
@@ -64,6 +65,7 @@ export default function App() {
   const [layout, setLayout] = useState(DEFAULT_LAYOUT)
   const [licence, setLicence] = useState(DEFAULT_LICENCE)
   const [units, setUnits] = useState(DEFAULT_UNITS)
+  const [language, setLanguage] = useState(DEFAULT_LANGUAGE)
   // While ventilating, edits go to a pending copy and reach the patient only
   // when accepted. In standby they apply directly — nothing is being
   // delivered, so there is nothing to guard.
@@ -71,6 +73,7 @@ export default function App() {
   const [confirm, setConfirm] = useState(null)
   const [now, setNow] = useState(Date.now())
 
+  const t = makeTranslator(language)
   const patient = PATIENT_PRESETS[patientKey]
   const ventilating = screen === SCREEN.VENTILATING
   // Configuration is reachable only from standby: changing the platform
@@ -244,7 +247,7 @@ export default function App() {
   if (screen === SCREEN.POWER_ON) {
     return (
       <div className="app app-centered">
-        <Disclaimer />
+        <Disclaimer t={t} />
         <div className="boot">
           <BrandMark large />
           <TestPanel
@@ -264,27 +267,27 @@ export default function App() {
             {testStatus.powerOn ? 'Continue to standby' : 'Running self test…'}
           </button>
         </div>
-        <AppFooter />
+        <AppFooter t={t} />
       </div>
     )
   }
 
   return (
     <div className="app">
-      <Disclaimer />
+      <Disclaimer t={t} />
       <header className="app-header">
         <div className="brand">
           <BrandMark />
           <div className="brand-text">
             <h1>ICU Ventilator Simulator</h1>
-            <p>Concept interface · simulated data only</p>
+            <p>{t('app.subtitle')}</p>
           </div>
         </div>
 
         <div className="header-status">
           <span className={ventilating ? 'status-chip status-running' : 'status-chip status-standby'}>
             <span className="status-dot" />
-            {ventilating ? 'Ventilating' : 'Standby'}
+            {ventilating ? t('state.ventilating') : t('state.standby')}
           </span>
           {ventilating && (
             <>
@@ -323,16 +326,17 @@ export default function App() {
             </button>
           )}
           <button type="button" className="btn btn-ghost btn-tiny" onClick={() => setLogOpen(true)}>
-            Log{events.length ? ` (${events.length})` : ''}
+            {t('action.log')}{events.length ? ` (${events.length})` : ''}
           </button>
           <button type="button" className="btn btn-ghost btn-tiny" onClick={() => setInfoOpen(true)}>
-            Device info
+            {t('action.deviceInfo')}
           </button>
         </div>
       </header>
 
       {screen === SCREEN.ADMIN ? (
         <AdminScreen
+          t={t}
           licence={licence}
           onLicenceChange={(next) => {
             setLicence(next)
@@ -342,6 +346,11 @@ export default function App() {
           onUnitsChange={(next) => {
             setUnits(next)
             log({ category: EVENT_CATEGORY.SETTING, message: 'Display units changed' })
+          }}
+          language={language}
+          onLanguageChange={(next) => {
+            setLanguage(next)
+            log({ category: EVENT_CATEGORY.SETTING, message: `Interface language changed to ${next}` })
           }}
           canEdit={!ventilating}
           blockedReason="Feature configuration is unavailable while ventilating. Stop ventilation to make changes."
@@ -381,6 +390,7 @@ export default function App() {
                 message: type === 'inspHold' ? 'Inspiratory hold requested' : 'Expiratory hold requested',
               })
             }}
+            t={t}
             onStopVentilation={() => setConfirm({ action: CONFIRMABLE.STOP })}
           />
           <section className="monitor">
@@ -403,6 +413,7 @@ export default function App() {
             />
             <WaveformDisplay
               waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
+              t={t}
               layout={layout}
               onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
               frozen={frozen}
@@ -436,7 +447,7 @@ export default function App() {
         </main>
       )}
 
-      <AppFooter />
+      <AppFooter t={t} />
       <DeviceInfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
       <EventLogDrawer open={logOpen} onClose={() => setLogOpen(false)} events={events} />
       <ConfirmDialog
