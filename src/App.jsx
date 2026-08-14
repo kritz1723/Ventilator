@@ -24,7 +24,10 @@ import { TEST_SUITES } from './engine/selfTests.js'
 import { AUDIO_PAUSE_SECONDS } from './engine/alarms.js'
 import { THEMES, DEFAULT_THEME } from './config/themes.js'
 import { DEFAULT_SELECTED_MEASUREMENTS } from './config/measurementCatalog.js'
-import { MODES } from './engine/ventilatorModes/index.js'
+import { MODES, DEFAULT_MODE } from './engine/ventilatorModes/index.js'
+import {
+  DEFAULT_LICENCE, isEnabled, licensedModes, resolveActiveMode,
+} from './config/licensing.js'
 import { DEFAULT_LAYOUT } from './config/traceCatalog.js'
 import {
   CONFIRMABLE, pendingDiff, clampToRanges,
@@ -58,6 +61,7 @@ export default function App() {
   const [events, setEvents] = useState([])
   const [logOpen, setLogOpen] = useState(false)
   const [layout, setLayout] = useState(DEFAULT_LAYOUT)
+  const [licence, setLicence] = useState(DEFAULT_LICENCE)
   // While ventilating, edits go to a pending copy and reach the patient only
   // when accepted. In standby they apply directly — nothing is being
   // delivered, so there is nothing to guard.
@@ -71,6 +75,9 @@ export default function App() {
   // while ventilating would alter behaviour underneath the operator.
   const canConfigure = screen === SCREEN.STANDBY
   const editedSettings = pendingSettings ?? settings
+  // The licence filters the registry itself, so an unlicensed mode is
+  // unreachable rather than merely hidden.
+  const availableModes = licensedModes(licence, MODES)
 
   const {
     waveform, loop, numerics, measurements, alarms, reset,
@@ -106,6 +113,17 @@ export default function App() {
     prevAlarmsRef.current = alarms
     logMany(entries)
   }, [alarms, logMany])
+
+  useEffect(() => {
+    const resolved = resolveActiveMode(licence, MODES, settings.mode, DEFAULT_MODE)
+    if (resolved !== settings.mode) {
+      setSettings((s) => ({ ...s, mode: resolved }))
+      log({
+        category: EVENT_CATEGORY.MODE,
+        message: `Mode changed to ${resolved} — previous mode is not licensed`,
+      })
+    }
+  }, [licence, settings.mode, log])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -268,7 +286,7 @@ export default function App() {
           </span>
           {ventilating && (
             <>
-              <span className="status-chip">{MODES[settings.mode].label}</span>
+              <span className="status-chip">{MODES[settings.mode]?.label ?? settings.mode}</span>
               <span className="status-chip">{PATIENT_CATEGORIES[patientData.category]?.label ?? 'Adult'}</span>
               <span className="status-chip">{patient.label}</span>
             </>
@@ -312,7 +330,15 @@ export default function App() {
       </header>
 
       {screen === SCREEN.ADMIN ? (
-        <AdminScreen onExit={() => {
+        <AdminScreen
+          licence={licence}
+          onLicenceChange={(next) => {
+            setLicence(next)
+            log({ category: EVENT_CATEGORY.SETTING, message: 'Feature configuration changed' })
+          }}
+          canEdit={!ventilating}
+          blockedReason="Feature configuration is unavailable while ventilating. Stop ventilation to make changes."
+          onExit={() => {
           setScreen(SCREEN.STANDBY)
           log({ category: EVENT_CATEGORY.STATE, message: 'Left configuration' })
         }} />
@@ -332,6 +358,11 @@ export default function App() {
         <main className="app-main">
           <ControlPanel
             settings={editedSettings}
+            availableModes={availableModes}
+            features={{
+              maneuvers: isEnabled(licence, 'maneuvers'),
+              flowPatterns: isEnabled(licence, 'flowPatterns'),
+            }}
             onSettingsChange={changeSettings}
             patientKey={patientKey}
             onPatientChange={setPatientKey}
@@ -366,7 +397,7 @@ export default function App() {
             <WaveformDisplay
               waveform={frozen && frozenWaveform ? frozenWaveform : waveform}
               layout={layout}
-              onLayoutChange={setLayout}
+              onLayoutChange={isEnabled(licence, 'waveformLayout') ? setLayout : null}
               frozen={frozen}
               onToggleFreeze={toggleFreeze}
               cursorIndex={cursorIndex}
@@ -381,16 +412,18 @@ export default function App() {
                 selected={selectedMeasurements}
                 onSelectedChange={setSelectedMeasurements}
               />
-              <LoopsDisplay loop={loop} />
+              {isEnabled(licence, 'loops') && <LoopsDisplay loop={loop} />}
             </div>
-            <SnapshotPanel
-              snapshots={snapshots}
-              onCapture={capture}
-              onClear={() => setSnapshots([])}
-              numerics={numerics}
-              measurements={measurements}
-              settings={settings}
-            />
+            {isEnabled(licence, 'captures') && (
+              <SnapshotPanel
+                snapshots={snapshots}
+                onCapture={capture}
+                onClear={() => setSnapshots([])}
+                numerics={numerics}
+                measurements={measurements}
+                settings={settings}
+              />
+            )}
           </section>
         </main>
       )}

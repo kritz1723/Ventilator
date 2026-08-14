@@ -248,18 +248,21 @@ export default function WaveformDisplay({
             <span>Sweep</span>
             <select
               value={sweepSeconds}
+              disabled={!onLayoutChange}
               onChange={(e) => onLayoutChange({ ...layout, sweepSeconds: Number(e.target.value) })}
             >
               {SWEEP_OPTIONS.map((s) => <option key={s} value={s}>{s}s</option>)}
             </select>
           </label>
-          <button
-            type="button"
-            className={editing ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
-            onClick={() => setEditing((v) => !v)}
-          >
-            {editing ? 'Done' : 'Layout'}
-          </button>
+          {onLayoutChange && (
+            <button
+              type="button"
+              className={editing ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
+              onClick={() => setEditing((v) => !v)}
+            >
+              {editing ? 'Done' : 'Layout'}
+            </button>
+          )}
           <button
             type="button"
             className={frozen ? 'btn btn-ghost btn-tiny freeze-active' : 'btn btn-ghost btn-tiny'}
@@ -272,7 +275,7 @@ export default function WaveformDisplay({
 
       {frozen && <p className="freeze-hint">Frozen — click or drag across a trace to inspect a point.</p>}
 
-      {editing && (
+      {editing && onLayoutChange && (
         <div className="layout-editor">
           <span className="layout-hint">
             {traces.length} of {MAX_TRACES} traces. A channel can appear more than once to

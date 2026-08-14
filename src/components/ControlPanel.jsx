@@ -25,6 +25,8 @@ function NumberField({ label, unit, value, onChange, min, max, step }) {
 
 export default function ControlPanel({
   settings,
+  availableModes,
+  features = {},
   onSettingsChange,
   patientKey,
   onPatientChange,
@@ -33,7 +35,8 @@ export default function ControlPanel({
   onStopVentilation,
 }) {
   const update = (patch) => onSettingsChange({ ...settings, ...patch })
-  const mode = MODES[settings.mode]
+  const modes = availableModes ?? MODES
+  const mode = MODES[settings.mode] ?? Object.values(modes)[0]
   const vtRange = rangeFor(patientCategory, 'tidalVolume')
   const rrRange = rangeFor(patientCategory, 'respRate')
   const piRange = rangeFor(patientCategory, 'pInsp')
@@ -44,7 +47,7 @@ export default function ControlPanel({
       <section className="panel control-section">
         <span className="panel-title">Mode</span>
         <div className="mode-list">
-          {Object.values(MODES).map((m) => (
+          {Object.values(modes).map((m) => (
             <button
               key={m.id}
               type="button"
@@ -94,7 +97,7 @@ export default function ControlPanel({
         )}
       </section>
 
-      {mode.supportsFlowPattern && (
+      {mode.supportsFlowPattern && features.flowPatterns !== false && (
         <section className="panel control-section">
           <span className="panel-title">Flow pattern</span>
           <div className="pattern-row">
@@ -136,6 +139,7 @@ export default function ControlPanel({
           onChange={(v) => update({ alarmLimits: { ...settings.alarmLimits, highRespRate: v } })} />
       </section>
 
+      {features.maneuvers !== false && (
       <section className="panel control-section">
         <span className="panel-title">Maneuvers</span>
         <div className="maneuver-row">
@@ -143,6 +147,7 @@ export default function ControlPanel({
           <button type="button" className="btn btn-ghost" onClick={() => onManeuver('expHold')}>Exp. hold</button>
         </div>
       </section>
+      )}
 
       <section className="panel control-section">
         <span className="panel-title">Simulated lung</span>
